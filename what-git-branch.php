@@ -13,17 +13,26 @@ add_action('wp_ajax_check_git_branch',array('cssllc_what_git_branch','ajax'));
 
 class cssllc_what_git_branch {
 
-	public static $is_branch = false;
+	public static $is_repo = false; // false or key of $paths where git repo was found
 	public static $branch = false;
 	public static $commit = false;
 
+	private static $paths = array();
+
 	function __construct() {
-		if (
-			file_exists(ABSPATH . '.git') &&
-			is_dir(ABSPATH . '.git') &&
-			file_exists(ABSPATH . '.git/HEAD')
-		)
-			self::$is_branch = true;
+		self::$paths = array(
+			ABSPATH . '.git',
+			ABSPATH . 'wp-content/.git',
+			plugin_dir_path(__FILE__) . '.git', // primarily for testing purposes
+		);
+		
+		foreach (self::$paths as $i => $path)
+			if (
+				file_exists($path) &&
+				is_dir($path) &&
+				file_exists($path . '/HEAD')
+			)
+				self::$is_repo = $i;
 
 		add_action('admin_bar_menu',array(__CLASS__,'bar'),99999999999999);
 		add_action('admin_footer',	array(__CLASS__,'heartbeat_js'));
@@ -42,8 +51,8 @@ class cssllc_what_git_branch {
 	}
 
 	public static function get_branch() {
-		if (!self::$is_branch) return false;
-		if (false !== ($file = file_get_contents(ABSPATH . '.git/HEAD'))) {
+		if (false === self::$is_repo) return false;
+		if (false !== ($file = file_get_contents(self::$paths[self::$is_repo] . '/HEAD'))) {
 			$pos = strripos($file,'/');
 			return self::$branch = trim(substr($file,($pos + 1)));
 		}
@@ -51,9 +60,9 @@ class cssllc_what_git_branch {
 	}
 
 	public static function get_commit() {
-		if (!self::$is_branch || false === self::$branch) return false;
-		if (file_exists(ABSPATH . '.git/refs/heads/' . self::get_branch()))
-			return self::$commit = trim(file_get_contents(ABSPATH . '.git/refs/heads/' . self::$branch));
+		if (false === self::$is_repo || false === self::$branch) return false;
+		if (file_exists(self::$paths[self::$is_repo] . '/refs/heads/' . self::get_branch()))
+			return self::$commit = trim(file_get_contents(self::$paths[self::$is_repo] . '/refs/heads/' . self::$branch));
 		return 'UNKNOWN';
 	}
 
