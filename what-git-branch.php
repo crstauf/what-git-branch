@@ -31,7 +31,7 @@ class cssllc_what_git_branch {
 			ABSPATH . 'wp-content/.git',
 			plugin_dir_path(__FILE__) . '.git', // primarily for testing purposes
 		);
-		
+
 		foreach (self::$paths as $i => $path)
 			if (
 				file_exists($path) &&
