@@ -8,6 +8,12 @@ Author: Caleb Stauffer
 Author URI: http://develop.calebstauffer.com
 */
 
+if (!defined('ABSPATH') || !function_exists('add_filter')) {
+	header( 'Status: 403 Forbidden' );
+	header( 'HTTP/1.1 403 Forbidden' );
+	exit();
+}
+
 new cssllc_what_git_branch;
 add_action('wp_ajax_check_git_branch',array('cssllc_what_git_branch','ajax'));
 
@@ -40,6 +46,7 @@ class cssllc_what_git_branch {
 	}
 
 	public static function bar($bar) {
+		if (!current_user_can('manage_options')) return;
 		wp_enqueue_script('heartbeat');
 		$args = array(
 			'id' => 'what-git-branch',
@@ -67,6 +74,7 @@ class cssllc_what_git_branch {
 	}
 
 	public static function heartbeat_js() {
+		if (current_user_can('manage_options')) {
 		?>
 
 		<script>
@@ -88,10 +96,13 @@ class cssllc_what_git_branch {
 		</script>
 
 		<?php
+		}
 	}
 
 	public static function ajax() {
-		wp_die(self::get_branch());
+		if (current_user_can('manage_options'))
+			wp_die(self::get_branch());
+		wp_die();
 	}
 
 }
