@@ -3,7 +3,7 @@
 Plugin Name: What Git Branch?
 Plugin URI:
 Description:
-Version: 0.0.1
+Version: 0.0.2
 Author: Caleb Stauffer
 Author URI: http://develop.calebstauffer.com
 */
@@ -26,6 +26,7 @@ class cssllc_what_git_branch {
 	private static $paths = array();
 
 	function __construct() {
+
 		self::$paths = array(
 			ABSPATH . '.git',
 			ABSPATH . 'wp-content/.git',
@@ -40,28 +41,46 @@ class cssllc_what_git_branch {
 			)
 				self::$is_repo = $i;
 
-		add_action('admin_bar_menu',array(__CLASS__,'bar'),99999999999999);
-		add_action('admin_footer',	array(__CLASS__,'heartbeat_js'));
-		add_action('wp_footer',		array(__CLASS__,'heartbeat_js'));
+		add_action('init',array(__CLASS__,'action_init'));
+	}
+
+	public static function action_init() {
+		if (!is_admin_bar_showing() || !current_user_can('manage_options')) return;
+
+		add_action('wp_enqueue_scripts',		array(__CLASS__,'action_enqueue_scripts'));
+		add_action('admin_enqueue_scripts',		array(__CLASS__,'action_enqueue_scripts'));
+		add_action('admin_bar_menu',			array(__CLASS__,'bar'),99999999999999);
+		add_action('admin_footer',				array(__CLASS__,'heartbeat_js'));
+		add_action('wp_footer',					array(__CLASS__,'heartbeat_js'));
+	}
+
+	public static function action_enqueue_scripts() {
+		wp_enqueue_script('heartbeat');
 	}
 
 	public static function bar($bar) {
-		if (!current_user_can('manage_options')) return;
-		wp_enqueue_script('heartbeat');
 		$args = array(
 			'id' => 'what-git-branch',
-			'title' => '<span class="code" style="display: inline-block; background-image: url(' . plugin_dir_url(__FILE__) . 'git.png); background-size: auto 50%; background-repeat: no-repeat; background-position: 7px center; background-color: #32373c; padding: 0 7px 0 27px; font-family: Consolas,Monaco,monospace;">' . self::get_branch() . '</span>',
+			'title' => '<span class="code" style="display: inline-block; background-image: url(' . plugin_dir_url(__FILE__) . 'git.png); background-size: auto 50%; background-repeat: no-repeat; background-position: 7px center; background-color: #32373c; padding: 0 7px 0 27px; font-family: Consolas,Monaco,monospace;" title="' . esc_attr(str_replace('.git','',self::$paths[self::$is_repo])) . '">' . self::get_branch() . '</span>',
 			'href' => '#',
 			'parent' => false,
 		);
 		$bar->add_node($args);
 	}
 
+	public static function get_repo() {
+		if (false === self::$is_repo) return false;
+		return json_encode(array(
+			'branch' => self::get_branch(),
+			'path' => esc_attr(str_replace(ABSPATH,'/',str_replace('.git','',self::$paths[self::$is_repo]))),
+		));
+	}
+
 	public static function get_branch() {
 		if (false === self::$is_repo) return false;
 		if (false !== ($file = file_get_contents(self::$paths[self::$is_repo] . '/HEAD'))) {
 			$pos = strripos($file,'/');
-			return self::$branch = trim(substr($file,($pos + 1)));
+			return self::$branch = esc_attr(trim(substr($file,($pos + 1))));
 		}
 		return false;
 	}
@@ -74,7 +93,6 @@ class cssllc_what_git_branch {
 	}
 
 	public static function heartbeat_js() {
-		if (current_user_can('manage_options')) {
 		?>
 
 		<script>
@@ -82,12 +100,13 @@ class cssllc_what_git_branch {
 			(function($) {
 
 				$(document).on('heartbeat-send',function(e,data) {
-					if ("undefined" !== typeof HBMonitor_time)
-						HBMonitor_time("Checking Git branch");
+					$("#wp-admin-bar-what-git-branch > a > span").html('?');
+					console.time('check-git-branch');
 					$.post("<?php echo admin_url('admin-ajax.php') ?>",{action: 'check_git_branch'},function(response) {
-						if ("undefined" !== typeof HBMonitor_time)
-							HBMonitor_time("Git branch: " + response);
-						$("#wp-admin-bar-what-git-branch > a > span").html(response);
+						var data = $.parseJSON(response);
+						if ("undefined" !== typeof HBMonitor)
+							HBMonitor("Git branch: " + data.branch,'','Repo: ' + data.path,'','','Check git branch');
+						$("#wp-admin-bar-what-git-branch > a > span").html(data.branch);
 					});
 				});
 
@@ -96,13 +115,10 @@ class cssllc_what_git_branch {
 		</script>
 
 		<?php
-		}
 	}
 
 	public static function ajax() {
-		if (current_user_can('manage_options'))
-			wp_die(self::get_branch());
-		wp_die();
+		wp_die(self::get_repo());
 	}
 
 }
