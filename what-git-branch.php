@@ -47,11 +47,14 @@ class cssllc_what_git_branch {
 	public static function action_init() {
 		if (!is_admin_bar_showing() || !current_user_can('manage_options')) return;
 
-		add_action('wp_enqueue_scripts',		array(__CLASS__,'action_enqueue_scripts'));
-		add_action('admin_enqueue_scripts',		array(__CLASS__,'action_enqueue_scripts'));
-		add_action('admin_bar_menu',			array(__CLASS__,'bar'),99999999999999);
-		add_action('admin_footer',				array(__CLASS__,'heartbeat_js'));
-		add_action('wp_footer',					array(__CLASS__,'heartbeat_js'));
+		add_action('wp_enqueue_scripts',			array(__CLASS__,'action_enqueue_scripts'));
+		add_action('admin_enqueue_scripts',			array(__CLASS__,'action_enqueue_scripts'));
+		add_action('admin_bar_menu',				array(__CLASS__,'bar'),99999999999999);
+		add_action('admin_head-plugins.php',		array(__CLASS__,'action_admin_head_plugins'));
+		add_filter('manage_plugins_columns',		array(__CLASS__,'filter_manage_plugins_columns'));
+		add_action('manage_plugins_custom_column',	array(__CLASS__,'action_manage_plugins_custom_column'),10,3);
+		add_action('admin_footer',					array(__CLASS__,'heartbeat_js'));
+		add_action('wp_footer',						array(__CLASS__,'heartbeat_js'));
 	}
 
 	public static function action_enqueue_scripts() {
@@ -66,6 +69,29 @@ class cssllc_what_git_branch {
 			'parent' => false,
 		);
 		$bar->add_node($args);
+	}
+
+	public static function action_admin_head_plugins() {
+		?>
+		<style type="text/css">.column-git { width: 20%; }</style>
+		<?php
+	}
+
+	public static function filter_manage_plugins_columns($columns) {
+		return array_merge($columns,array('git' => 'Git Info'));
+	}
+
+	public static function action_manage_plugins_custom_column($column,$file,$data) {
+		if ('git' !== $column) return false;
+		$git_path = dirname(WP_PLUGIN_DIR . '/' . $file) . '/.git/';
+		if (file_exists($git_path) && is_dir($git_path)) {
+			if (false !== ($file = file_get_contents($git_path . 'HEAD'))) {
+				$pos = strripos($file,'/');
+				echo 'Branch <span class="code">' . esc_attr(trim(substr($file,($pos + 1)))) . '</span>';
+			} else
+				echo '&mdash;';
+		} else
+			echo '&mdash;';
 	}
 
 	public static function get_repo() {
