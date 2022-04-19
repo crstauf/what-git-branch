@@ -16,8 +16,12 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 
 /**
  * @todo introduce support for link to branch on GitHub
+ * @todo add bash script to write current branch to file (`git rev-parse --abbrev-ref HEAD`)
+ * @todo add support for reading file created by bash script
  */
 class CSSLLC_What_Git_Branch {
+
+	public const HEARTBEAT_KEY = 'what_git_branch';
 
 	protected $search_paths = array();
 	protected $git_dir = '';
@@ -107,6 +111,7 @@ class CSSLLC_What_Git_Branch {
 	protected function enqueue_assets() : void {
 		wp_enqueue_script( 'heartbeat' );
 		wp_add_inline_style( 'admin-bar', $this->add_inline_style__admin_bar() );
+		wp_add_inline_script( 'heartbeat', $this->add_inline_script__heartbeat(), 'before' );
 	}
 
 	/**
@@ -118,7 +123,7 @@ class CSSLLC_What_Git_Branch {
 		ob_start();
 		?>
 
-		#wp-admin-bar-what-git-branch .code {
+		#wp-admin-bar-what-git-branch .what-git-branch {
 			display: inline-block;
 			padding: 0 7px 0 27px;
 			background-image: url( <?php echo plugin_dir_url( __FILE__ ) ?>git.png );
@@ -142,6 +147,37 @@ class CSSLLC_What_Git_Branch {
 	}
 
 	/**
+	 * Add inline script to heartbeat script.
+	 * 
+	 * @return string
+	 */
+	protected function add_inline_script__heartbeat() : string {
+		ob_start();
+		?>
+
+		( function() {
+
+			jQuery( document ).on( 'heartbeat-send', function ( ev, data ) {
+				data[ '<?php echo self::HEARTBEAT_KEY ?>' ] = true;
+			} );
+
+			jQuery( document ).on( 'heartbeat-tick', function( ev, data ) {
+				if ( ! data[ '<?php echo self::HEARTBEAT_KEY ?>' ] ) {
+					return;
+				}
+
+				document.querySelectorAll( '.what-git-branch' ).forEach( function( el ) {
+					el.innerText = data[ '<?php echo self::HEARTBEAT_KEY ?>' ]
+				} );
+			} );
+
+		} () );
+
+		<?php
+		return trim( ob_get_clean() );
+	}
+
+	/**
 	 * Get branch name.
 	 * 
 	 * @return string
@@ -158,7 +194,7 @@ class CSSLLC_What_Git_Branch {
 		}
 
 		$pos = strripos( $head, '/' );
-		$this->current_branch = substr( $head, ( $pos + 1 ) );
+		$this->current_branch = trim( substr( $head, ( $pos + 1 ) ) );
 
 		return $this->current_branch;
 	}
@@ -169,14 +205,16 @@ class CSSLLC_What_Git_Branch {
 	 * @return void
 	 */
 	public function action__init() : void {
-		if ( 'init' !== current_action() ) {
+		if ( 
+			'init' !== current_action() 
+			|| ! current_user_can( 'manage_options' )
+		) {
 			return;
 		}
 
-		if (
-			   ! current_user_can( 'manage_options' )
-			|| ! is_admin_bar_showing()
-		) {
+		add_action( 'heartbeat_received', array( $this, 'action__heartbeat_received' ), 10, 2 );
+
+		if ( ! is_admin_bar_showing() ) {
 			return;
 		}
 
@@ -193,6 +231,10 @@ class CSSLLC_What_Git_Branch {
 	 * @return void
 	 */
 	public function action__wp_enqueue_scripts() : void {
+		if ( 'wp_enqueue_scripts' !== current_action() ) {
+			return;
+		}
+
 		$this->enqueue_assets();
 	}
 
@@ -204,6 +246,10 @@ class CSSLLC_What_Git_Branch {
 	 * @return void
 	 */
 	public function action__admin_enqueue_scripts() : void {
+		if ( 'admin_enqueue_scripts' !== current_action() ) {
+			return;
+		}
+
 		$this->enqueue_assets();
 	}
 
@@ -215,10 +261,14 @@ class CSSLLC_What_Git_Branch {
 	 * @return void
 	 */
 	public function action__admin_bar_menu( WP_Admin_Bar $bar ) : void {
+		if ( 'admin_bar_menu' !== current_action() ) {
+			return;
+		}
+
 		$args = array(
 			'id'     => 'what-git-branch',
 			'title'  => sprintf( 
-				'<span class="code" title="%s">%s</span>', 
+				'<span class="what-git-branch" title="%s">%s</span>', 
 				esc_html( $this->git_dir ),
 				esc_html( $this->get_current_branch() ) 
 			),
@@ -227,6 +277,24 @@ class CSSLLC_What_Git_Branch {
 		);
 
 		$bar->add_node( $args );
+	}
+
+	/**
+	 * Action: heartbeat_received
+	 * 
+	 * @param array $response
+	 * @param array $data
+	 * 
+	 * @return array
+	 */
+	public function action__heartbeat_received( $response, array $data ) {
+		if ( empty( $data[ self::HEARTBEAT_KEY ] ) ) {
+			return $response;
+		}
+
+		$response[ self::HEARTBEAT_KEY ] = $this->get_current_branch();
+
+		return $response;
 	}
 
 }
