@@ -18,6 +18,7 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
  * @todo introduce support for link to branch on GitHub
  * @todo add bash script to write current branch to file (`git rev-parse --abbrev-ref HEAD`)
  * @todo add support for reading file created by bash script
+ * @todo add support to copy branch name to clipboard on admin bar node click
  */
 class CSSLLC_What_Git_Branch {
 
@@ -49,9 +50,9 @@ class CSSLLC_What_Git_Branch {
 	 */
 	protected function __construct() {
 		$this->set_search_paths();
-		$this->find_repo_dir();
+		$this->set_current_branch();
 
-		if ( empty( $this->git_dir ) ) {
+		if ( empty( $this->current_branch ) ) {
 			return;
 		}
 
@@ -82,6 +83,10 @@ class CSSLLC_What_Git_Branch {
 	 * @return void
 	 */
 	protected function find_repo_dir() : void {
+		if ( ! empty( $this->git_dir ) ) {
+			return;
+		}
+		
 		if ( empty( $this->search_paths ) ) {
 			return;
 		}
@@ -99,19 +104,22 @@ class CSSLLC_What_Git_Branch {
 
 			$this->git_dir = $this->search_paths[ $i ];
 			
-			break; // currently only supports one git repo
+			break; // supports one git repo
 		}
 	}
 
 	/**
 	 * Enqueue assets.
 	 * 
+	 * @uses $this->add_inline_script__heartbeat()
+	 * @uses $this->add_inline_style__admin_bar()
+	 * 
 	 * @return void
 	 */
 	protected function enqueue_assets() : void {
-		wp_enqueue_script( 'heartbeat' );
-		wp_add_inline_style( 'admin-bar', $this->add_inline_style__admin_bar() );
+		   wp_enqueue_script( 'heartbeat' );
 		wp_add_inline_script( 'heartbeat', $this->add_inline_script__heartbeat(), 'before' );
+		wp_add_inline_style(  'admin-bar', $this->add_inline_style__admin_bar() );
 	}
 
 	/**
@@ -178,25 +186,46 @@ class CSSLLC_What_Git_Branch {
 	}
 
 	/**
-	 * Get branch name.
+	 * Set current branch.
 	 * 
-	 * @return string
+	 * @uses $this->find_repo_dir()
+	 * 
+	 * @return void
+	 * 
+	 * @todo check external file
 	 */
-	protected function get_current_branch() : string {
-		if ( ! empty( $this->current_branch ) ) {
-			return $this->current_branch;
+	protected function set_current_branch() : void {
+		$this->find_repo_dir();
+
+		if ( empty( $this->git_dir ) ) {
+			$this->current_branch = 'N/A';
+			return;
 		}
 
 		$head = file_get_contents( $this->git_dir . '.git/HEAD' );
 
 		if ( false === $head ) {
-			return 'N/A';
+			$this->current_branch = 'N/A';
+			return;
 		}
 
 		$pos = strripos( $head, '/' );
 		$this->current_branch = trim( substr( $head, ( $pos + 1 ) ) );
+	}
 
-		return $this->current_branch;
+	/**
+	 * Get branch name.
+	 * 
+	 * @uses $this->set_current_branch()
+	 * 
+	 * @return string
+	 */
+	public function get_current_branch() : string {
+		if ( empty( $this->current_branch ) ) {
+			$this->set_current_branch();
+		}
+
+		return apply_filters( 'what_git_branch/current_branch', $this->current_branch );
 	}
 
 	/**
@@ -258,6 +287,8 @@ class CSSLLC_What_Git_Branch {
 	 * 
 	 * @param WP_Admin_Bar $bar (reference)
 	 * 
+	 * @uses $this->get_current_branch()
+	 * 
 	 * @return void
 	 */
 	public function action__admin_bar_menu( WP_Admin_Bar $bar ) : void {
@@ -284,6 +315,8 @@ class CSSLLC_What_Git_Branch {
 	 * 
 	 * @param array $response
 	 * @param array $data
+	 * 
+	 * @uses $this->get_current_branch()
 	 * 
 	 * @return array
 	 */
