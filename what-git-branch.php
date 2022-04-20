@@ -26,7 +26,8 @@ class CSSLLC_What_Git_Branch {
 	protected $search_paths = array();
 	protected $git_dir = '';
 	protected $external_file = '';
-	protected $current_branch = '';
+	protected $head_ref = '';
+	protected $branch = '';
 
 	/**
 	 * Initialize.
@@ -49,13 +50,13 @@ class CSSLLC_What_Git_Branch {
 	 * Construct.
 	 *
 	 * @uses $this->set_search_paths()
-	 * @uses $this->set_current_branch()
+	 * @uses $this->set_head_ref()
 	 */
 	protected function __construct() {
 		$this->set_search_paths();
-		$this->set_current_branch();
+		$this->set_head_ref();
 
-		if ( empty( $this->current_branch ) ) {
+		if ( empty( $this->head_ref ) ) {
 			return;
 		}
 
@@ -81,29 +82,29 @@ class CSSLLC_What_Git_Branch {
 	}
 	
 	/**
-	 * Set current branch.
+	 * Set head reference.
 	 * 
-	 * @uses $this->set_branch_by_file()
-	 * @uses $this->set_branch_by_repo()
+	 * @uses $this->set_head_ref_by_file()
+	 * @uses $this->set_head_ref_by_repo()
 	 * 
 	 * @return void
 	 */
-	protected function set_current_branch() : void {
-		$this->set_branch_by_file();
+	protected function set_head_ref() : void {
+		$this->set_head_ref_by_file();
 
-		if ( ! empty( $this->current_branch ) ) {
+		if ( ! empty( $this->head_ref ) ) {
 			return;
 		}
-
-		$this->set_branch_by_repo();
+		
+		$this->set_head_ref_by_repo();
 	}
 	
 	/**
-	 * Set branch from file in searchable paths.
+	 * Set head reference from file in searchable paths.
 	 * 
 	 * @return void
 	 */
-	protected function set_branch_by_file() : void {
+	protected function set_head_ref_by_file() : void {
 		if ( empty( $this->search_paths ) ) {
 			return;
 		}
@@ -125,32 +126,31 @@ class CSSLLC_What_Git_Branch {
 			return;
 		}
 
-		$this->current_branch = sanitize_text_field( $external_file );
+		$this->head_ref = sanitize_text_field( $external_file );
 	}
 
 	/**
-	 * Set branch from git repository data.
+	 * Set head reference from git repository data.
 	 *
 	 * @uses $this->find_repo_dir()
 	 * 
 	 * @return void
 	 */
-	protected function set_branch_by_repo() : void {
+	protected function set_head_ref_by_repo() : void {
 		$this->find_repo_dir();
 
 		if ( empty( $this->git_dir ) ) {
 			return;
 		}
 
-		$head = file_get_contents( $this->git_dir . '.git/HEAD' );
-		$head = sanitize_text_field( $head );
+		$head_ref = file_get_contents( $this->git_dir . '.git/HEAD' );
+		$head_ref = sanitize_text_field( $head_ref );
 
-		if ( false === $head ) {
+		if ( false === $head_ref ) {
 			return;
 		}
 
-		$pos = strripos( $head, '/' );
-		$this->current_branch = trim( substr( $head, ( $pos + 1 ) ) );
+		$this->head_ref = $head_ref;
 	}
 
 	/**
@@ -200,18 +200,22 @@ class CSSLLC_What_Git_Branch {
 	 * 
 	 * @see $this->register_dashboard_widget()
 	 * 
+	 * @uses $this->get_head_ref()
+	 * 
 	 * @return void
 	 */
 	public function callback__dashboard_widget() : void {
-		if ( empty( $this->get_current_branch() ) ) {
+		$head_ref = $this->get_head_ref();
+
+		if ( empty( $head_ref ) ) {
 			echo '<p>Unable to determine current branch.</p>';
 
 			return;
 		}
 
 		echo '<div style="order: -1">'
-			. '<h3>Branch</h3>'
-			. '<p><code class="what-git-branch">' . esc_html( $this->get_current_branch() ) . '</code></p>'
+			. sprintf( '<h3>%s</h3>', $this->is_branch() ? 'Branch' : 'Commit' )
+			. '<p><code class="what-git-branch">' . esc_html( $head_ref ) . '</code></p>'
 		. '</div>';
 
 		if ( empty( $this->git_dir ) ) {
@@ -371,18 +375,68 @@ class CSSLLC_What_Git_Branch {
 	}
 
 	/**
-	 * Get branch name.
+	 * Get head reference.
 	 * 
-	 * @uses $this->set_current_branch()
+	 * @uses $this->set_head_ref()
+	 * @uses $this->get_branch()
 	 * 
 	 * @return string
 	 */
-	public function get_current_branch() : string {
-		if ( empty( $this->current_branch ) ) {
-			$this->set_current_branch();
+	public function get_head_ref() : string {
+		if ( empty( $this->head_ref ) ) {
+			$this->set_head_ref();
 		}
 
-		return apply_filters( 'what_git_branch/current_branch', $this->current_branch );
+		if ( $this->is_branch() ) {
+			return apply_filters( 'what_git_branch/branch', $this->get_branch() );
+		}
+
+		return apply_filters( 'what_git_branch/commit', substr( $this->head_ref, 0, 7 ), $this->head_ref );
+	}
+
+	/**
+	 * Get branch name.
+	 * 
+	 * @uses $this->is_branch()
+	 * 
+	 * @return string
+	 */
+	protected function get_branch() : string {
+		if ( ! $this->is_branch() ) {
+			return '';
+		}
+
+		if ( ! empty( $this->branch ) ) {
+			return $this->branch;
+		}
+
+		$pos = strripos( $this->head_ref, '/' );
+
+		$this->branch = trim( substr( $this->head_ref, ( $pos + 1 ) ) );
+
+		return $this->branch;
+	}
+
+	/**
+	 * Check if head reference is a branch.
+	 * 
+	 * @uses $this->get_head_ref()
+	 * 
+	 * @return bool
+	 */
+	public function is_branch() : bool {
+		return false !== strripos( $this->head_ref, '/' );
+	}
+
+	/**
+	 * Check if head reference is a commit.
+	 * 
+	 * @uses $this->is_branch()
+	 * 
+	 * @return bool
+	 */
+	public function is_commit() : bool {
+		return ! $this->is_branch();
 	}
 
 	/**
@@ -460,7 +514,7 @@ class CSSLLC_What_Git_Branch {
 	 * 
 	 * @param WP_Admin_Bar $bar (reference)
 	 * 
-	 * @uses $this->get_current_branch()
+	 * @uses $this->get_head_ref()
 	 * 
 	 * @return void
 	 */
@@ -474,11 +528,11 @@ class CSSLLC_What_Git_Branch {
 			'title'  => sprintf( 
 				'<span class="what-git-branch" title="%s">%s</span>', 
 				esc_html( $this->git_dir ),
-				esc_html( $this->get_current_branch() ) 
+				esc_html( $this->get_head_ref() ) 
 			),
 			'parent' => false,
 			'meta'   => array(
-				'onclick' => 'if ( navigator.clipboard) { navigator.clipboard.writeText( "' . $this->get_current_branch() . '" ).then( () => { alert( "Copied branch name." ) } ) }',
+				'onclick' => 'if ( navigator.clipboard) { navigator.clipboard.writeText( "' . $this->get_head_ref() . '" ).then( () => { alert( "Copied branch name." ) } ) }',
 			),
 		);
 
@@ -496,7 +550,7 @@ class CSSLLC_What_Git_Branch {
 			$args['href'] = sprintf( 
 				'https://github.com/%s/tree/%s',
 				sanitize_text_field( $github_repo ),
-				sanitize_text_field( $this->get_current_branch() )
+				sanitize_text_field( $this->get_head_ref() )
 			);
 		}
 
@@ -509,7 +563,7 @@ class CSSLLC_What_Git_Branch {
 	 * @param mixed $response
 	 * @param array $data
 	 * 
-	 * @uses $this->get_current_branch()
+	 * @uses $this->get_head_ref()
 	 * 
 	 * @return array
 	 */
@@ -518,7 +572,7 @@ class CSSLLC_What_Git_Branch {
 			return $response;
 		}
 
-		$response[ self::HEARTBEAT_KEY ] = $this->get_current_branch();
+		$response[ self::HEARTBEAT_KEY ] = $this->get_head_ref();
 
 		return $response;
 	}
