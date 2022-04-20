@@ -16,6 +16,7 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 
 /**
  * @todo add log of branch changes to dashboard widget
+ * @todo update GitHub links on Heartbeat receive
  */
 class CSSLLC_What_Git_Branch {
 
@@ -213,8 +214,15 @@ class CSSLLC_What_Git_Branch {
 		}
 
 		echo '<div style="order: -1">'
-			. sprintf( '<h3>%s</h3>', $this->is_branch() ? 'Branch' : 'Commit' )
-			. '<p><code class="what-git-branch">' . esc_html( $head_ref ) . '</code></p>'
+			. '<h3>Head</h3>'
+			. '<p>'
+				. '<code class="what-git-branch">' . esc_html( $head_ref ) . '</code>';
+
+				if ( ! empty( $this->get_github_url() ) ) { 
+					echo '<a href="' . esc_url( $this->get_github_url() ) . '">View on GitHub</a>';
+				}
+			
+			echo '</p>'
 		. '</div>';
 
 		if ( empty( $this->git_dir ) ) {
@@ -305,6 +313,13 @@ class CSSLLC_What_Git_Branch {
 		#dashboard-widgets-wrap #what-git-branch .inside > div {
 			width: 50%;
 			order: 1;
+		}
+
+		#dashboard-widgets-wrap #what-git-branch .inside a {
+			float: right;
+			display: inline-block;
+			line-height: 1.9em;
+			font-size: 0.8em;
 		}
 
 		#dashboard-widgets-wrap #what-git-branch .inside code {
@@ -439,6 +454,31 @@ class CSSLLC_What_Git_Branch {
 	}
 
 	/**
+	 * Get URL to head reference on GitHub.
+	 * 
+	 * @return string
+	 */
+	protected function get_github_url() : string {
+		$github_repo = '';
+
+		if ( defined( 'WHAT_GIT_BRANCH_GITHUB_REPO' ) ) {
+			$github_repo = constant( 'WHAT_GIT_BRANCH_GITHUB_REPO' );
+		}
+
+		$github_repo = apply_filters( 'what_git_branch/github_repo', $github_repo );
+
+		if ( empty( $github_repo ) ) {
+			return '';
+		}
+
+		return sprintf( 
+			'https://github.com/%s/tree/%s',
+			sanitize_text_field( $github_repo ),
+			sanitize_text_field( $this->get_head_ref() )
+		);
+	}
+
+	/**
 	 * Action: init
 	 * 
 	 * @return void
@@ -535,22 +575,10 @@ class CSSLLC_What_Git_Branch {
 			),
 		);
 
-		$github_repo = '';
+		if ( ! empty( $this->get_github_url() ) ) {
+			$args['href'] = $this->get_github_url();
 
-		if ( defined( 'WHAT_GIT_BRANCH_GITHUB_REPO' ) ) {
-			$github_repo = constant( 'WHAT_GIT_BRANCH_GITHUB_REPO' );
-		}
-
-		$github_repo = apply_filters( 'what_git_branch/github_repo', $github_repo );
-
-		if ( ! empty( $github_repo ) ) {
 			unset( $args['meta']['onclick'] );
-
-			$args['href'] = sprintf( 
-				'https://github.com/%s/tree/%s',
-				sanitize_text_field( $github_repo ),
-				sanitize_text_field( $this->get_head_ref() )
-			);
 		}
 
 		$bar->add_node( $args );
