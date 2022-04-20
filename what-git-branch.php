@@ -20,6 +20,7 @@ class CSSLLC_What_Git_Branch {
 
 	public const HEARTBEAT_KEY = 'what_git_branch';
 	public const EXTERNAL_FILE = '.what-git-branch';
+	public const HEAD_PREFIX   = 'ref: refs/heads/';
 
 	protected $search_paths = array();
 	protected $git_dir = '';
@@ -453,9 +454,7 @@ class CSSLLC_What_Git_Branch {
 			return $this->branch;
 		}
 
-		$pos = strripos( $this->head_ref, '/' );
-
-		$this->branch = trim( substr( $this->head_ref, ( $pos + 1 ) ) );
+		$this->branch = trim( str_replace( self::HEAD_PREFIX, '', $this->head_ref ) );
 
 		return $this->branch;
 	}
@@ -463,10 +462,16 @@ class CSSLLC_What_Git_Branch {
 	/**
 	 * Check if head reference is a branch.
 	 *
+	 * If external file in use, always return true.
+	 *
 	 * @return bool
 	 */
 	public function is_branch() : bool {
-		return false !== strripos( $this->head_ref, '/' );
+		if ( ! empty( $this->external_file ) ) {
+			return true;
+		}
+
+		return false !== stripos( $this->head_ref, self::HEAD_PREFIX );
 	}
 
 	/**
