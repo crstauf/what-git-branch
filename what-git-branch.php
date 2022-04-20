@@ -17,6 +17,8 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 /**
  * @todo introduce support for link to branch on GitHub
  * @todo add support to copy branch name to clipboard on admin bar node click
+ * @todo add dashboard widget
+ * @todo add log of branch changes to dashboard widget
  */
 class CSSLLC_What_Git_Branch {
 
@@ -46,6 +48,9 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Construct.
+	 *
+	 * @uses $this->set_search_paths()
+	 * @uses $this->set_current_branch()
 	 */
 	protected function __construct() {
 		$this->set_search_paths();
@@ -75,19 +80,127 @@ class CSSLLC_What_Git_Branch {
 
 		$this->search_paths = $paths;
 	}
+	
+	/**
+	 * Set current branch.
+	 * 
+	 * @uses $this->set_branch_by_file()
+	 * @uses $this->set_branch_by_repo()
+	 * 
+	 * @return void
+	 */
+	protected function set_current_branch() : void {
+		$this->set_branch_by_file();
+
+		if ( ! empty( $this->current_branch ) ) {
+			return;
+		}
+
+		$this->set_branch_by_repo();
+	}
+	
+	/**
+	 * Set branch from file in searchable paths.
+	 * 
+	 * @return void
+	 */
+	protected function set_branch_by_file() : void {
+		if ( empty( $this->search_paths ) ) {
+			return;
+		}
+
+		foreach ( $this->search_paths as $path ) {
+			$path .= self::EXTERNAL_FILE;
+
+			if ( ! file_exists( $path ) ) {
+				continue;
+			}
+
+			$external_file = file_get_contents( $path );
+
+			break;
+		}
+
+		if ( empty( $external_file ) ) {
+			return;
+		}
+
+		$this->current_branch = sanitize_text_field( $external_file );
+	}
+
+	/**
+	 * Set branch from git repository data.
+	 *
+	 * @uses $this->find_repo_dir()
+	 * 
+	 * @return void
+	 */
+	protected function set_branch_by_repo() : void {
+		$this->find_repo_dir();
+
+		if ( empty( $this->git_dir ) ) {
+			return;
+		}
+
+		$head = file_get_contents( $this->git_dir . '.git/HEAD' );
+		$head = sanitize_text_field( $head );
+
+		if ( false === $head ) {
+			return;
+		}
+
+		$pos = strripos( $head, '/' );
+		$this->current_branch = trim( substr( $head, ( $pos + 1 ) ) );
+	}
+
+	/**
+	 * Find repository directory.
+	 * 
+	 * @return void
+	 */
+	protected function find_repo_dir() : void {
+		if ( ! empty( $this->git_dir ) ) {
+			return;
+		}
+
+		if ( empty( $this->search_paths ) ) {
+			return;
+		}
+
+		foreach ( $this->search_paths as $path ) {
+			$path .= '.git/';
+
+			if (
+				   ! file_exists( $path )
+				|| ! is_dir( $path )
+				|| ! file_exists( $path . 'HEAD' )
+			) {
+				continue;
+			}
+
+			$this->git_dir = dirname( $path );
+			
+			break; // supports one git repo
+		}
+	}
 
 	/**
 	 * Enqueue assets.
 	 * 
-	 * @uses $this->add_inline_script__heartbeat()
 	 * @uses $this->add_inline_style__admin_bar()
+	 * @uses $this->add_inline_script__heartbeat()
 	 * 
 	 * @return void
 	 */
 	protected function enqueue_assets() : void {
+		wp_add_inline_style( 'admin-bar', $this->add_inline_style__admin_bar() );
+		
+		if ( empty( $this->git_dir ) ) {
+			return;
+		}
+
 		   wp_enqueue_script( 'heartbeat' );
 		wp_add_inline_script( 'heartbeat', $this->add_inline_script__heartbeat(), 'before' );
-		wp_add_inline_style(  'admin-bar', $this->add_inline_style__admin_bar() );
 	}
 
 	/**
@@ -132,18 +245,20 @@ class CSSLLC_What_Git_Branch {
 		?>
 
 		( function() {
+		
+			var heartbeat_key = <?php echo json_encode( self::HEARTBEAT_KEY ) ?>;
 
 			jQuery( document ).on( 'heartbeat-send', function ( ev, data ) {
-				data[ '<?php echo self::HEARTBEAT_KEY ?>' ] = true;
+				data[ heartbeat_key ] = true;
 			} );
 
 			jQuery( document ).on( 'heartbeat-tick', function( ev, data ) {
-				if ( ! data[ '<?php echo self::HEARTBEAT_KEY ?>' ] ) {
+				if ( ! data[ heartbeat_key ] ) {
 					return;
 				}
 
 				document.querySelectorAll( '.what-git-branch' ).forEach( function( el ) {
-					el.innerText = data[ '<?php echo self::HEARTBEAT_KEY ?>' ]
+					el.innerText = data[ heartbeat_key ]
 				} );
 			} );
 
@@ -151,108 +266,6 @@ class CSSLLC_What_Git_Branch {
 
 		<?php
 		return trim( ob_get_clean() );
-	}
-
-	/**
-	 * Set current branch.
-	 * 
-	 * @uses $this->find_repo_dir()
-	 * 
-	 * @return void
-	 * 
-	 * @todo check external file
-	 */
-	protected function set_current_branch() : void {
-		$this->set_branch_by_file();
-
-		if ( ! empty( $this->current_branch ) ) {
-			return;
-		}
-
-		$this->set_branch_by_repo();
-	}
-
-	/**
-	 * Set branch from file in searchable paths.
-	 * 
-	 * @return void
-	 */
-	protected function set_branch_by_file() : void {
-		if ( empty( $this->search_paths ) ) {
-			return;
-		}
-
-		foreach ( $this->search_paths as $path ) {
-			$path .= self::EXTERNAL_FILE;
-
-			if ( ! file_exists( $path ) ) {
-				continue;
-			}
-
-			$external_file = file_get_contents( $path );
-
-			break;
-		}
-
-		if ( empty( $external_file ) ) {
-			return;
-		}
-
-		$this->current_branch = sanitize_text_field( $external_file );
-	}
-
-	/**
-	 * Set branch from git repository data.
-	 * 
-	 * @return void
-	 */
-	protected function set_branch_by_repo() : void {
-		$this->find_repo_dir();
-
-		if ( empty( $this->git_dir ) ) {
-			return;
-		}
-
-		$head = file_get_contents( $this->git_dir . '.git/HEAD' );
-		$head = sanitize_text_field( $head );
-
-		if ( false === $head ) {
-			return;
-		}
-
-		$pos = strripos( $head, '/' );
-		$this->current_branch = trim( substr( $head, ( $pos + 1 ) ) );
-	}
-
-	/**
-	 * Find repository directory.
-	 * 
-	 * @return void
-	 */
-	protected function find_repo_dir() : void {
-		if ( ! empty( $this->git_dir ) ) {
-			return;
-		}
-
-		if ( empty( $this->search_paths ) ) {
-			return;
-		}
-
-		foreach ( $this->search_paths as $i => $path ) {
-			$path .= '.git/';
-
-			if (
-				   ! file_exists( $path )
-				|| ! is_dir( $path )
-				|| ! file_exists( $path . 'HEAD' )
-			) {
-				continue;
-			}
-
-			$this->git_dir = $this->search_paths[ $i ];
-			
-			break; // supports one git repo
-		}
 	}
 
 	/**
@@ -355,7 +368,7 @@ class CSSLLC_What_Git_Branch {
 	/**
 	 * Action: heartbeat_received
 	 * 
-	 * @param array $response
+	 * @param mixed $response
 	 * @param array $data
 	 * 
 	 * @uses $this->get_current_branch()
@@ -363,7 +376,10 @@ class CSSLLC_What_Git_Branch {
 	 * @return array
 	 */
 	public function action__heartbeat_received( $response, array $data ) {
-		if ( empty( $data[ self::HEARTBEAT_KEY ] ) ) {
+		if ( 
+			   empty( $this->git_dir )
+			|| empty( $data[ self::HEARTBEAT_KEY ] ) 
+		) {
 			return $response;
 		}
 
