@@ -15,7 +15,6 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 }
 
 /**
- * @todo add dashboard widget
  * @todo add log of branch changes to dashboard widget
  */
 class CSSLLC_What_Git_Branch {
@@ -25,6 +24,7 @@ class CSSLLC_What_Git_Branch {
 
 	protected $search_paths = array();
 	protected $git_dir = '';
+	protected $external_file = '';
 	protected $current_branch = '';
 
 	/**
@@ -114,6 +114,7 @@ class CSSLLC_What_Git_Branch {
 				continue;
 			}
 
+			$this->external_file = $path;
 			$external_file = file_get_contents( $path );
 
 			break;
@@ -183,17 +184,73 @@ class CSSLLC_What_Git_Branch {
 	}
 
 	/**
+	 * Register Dashboard widget.
+	 * 
+	 * @uses wp_add_dashboard_widget()
+	 * 
+	 * @return void
+	 */
+	protected function register_dashboard_widget() : void {
+		wp_add_dashboard_widget( 'what-git-branch', 'What Git Branch?', array( $this, 'callback__dashboard_widget' ) );
+	}
+
+	/**
+	 * Callback: wp_add_dashboard_widget()
+	 * 
+	 * @see $this->register_dashboard_widget()
+	 * 
+	 * @return void
+	 */
+	public function callback__dashboard_widget() : void {
+		if ( empty( $this->get_current_branch() ) ) {
+			echo '<p>Unable to determine current branch.</p>';
+
+			return;
+		}
+
+		echo '<div style="order: -1">'
+			. '<h3>Branch</h3>'
+			. '<p><code class="what-git-branch">' . esc_html( $this->get_current_branch() ) . '</code></p>'
+		. '</div>';
+
+		if ( empty( $this->git_dir ) ) {
+			echo '<div>'
+				. '<h3>External File</h3>'
+				. '<p><code>' . esc_html( $this->external_file ) . '</code></p>'
+			. '</div>';
+
+			return;
+		}
+
+		echo '<div>'
+			. '<h3>Git directory</h3>'
+			. '<p><code>' . esc_html( $this->git_dir ) . '</code></p>'
+		. '</div>';
+	}
+
+	/**
 	 * Enqueue assets.
 	 * 
 	 * @uses $this->add_inline_style__admin_bar()
+	 * @uses $this->add_inline_style__dashboard()
+	 * @uses $this->needs_heartbeat()
 	 * @uses $this->add_inline_script__heartbeat()
 	 * 
 	 * @return void
 	 */
 	protected function enqueue_assets() : void {
-		wp_add_inline_style( 'admin-bar', $this->add_inline_style__admin_bar() );
+		if ( is_admin_bar_showing() ) {
+			wp_add_inline_style( 'admin-bar', $this->add_inline_style__admin_bar() );
+		}
+
+		if ( 
+			 function_exists( 'get_current_screen' ) 
+			&& 'dashboard' === get_current_screen()->id 
+		) {
+			wp_add_inline_style( 'dashboard', $this->add_inline_style__dashboard() );
+		}
 		
-		if ( empty( $this->git_dir ) ) {
+		if ( ! $this->needs_heartbeat() ) {
 			return;
 		}
 
@@ -223,6 +280,59 @@ class CSSLLC_What_Git_Branch {
 
 		<?php
 		return trim( ob_get_clean() );
+	}
+
+	protected function add_inline_style__dashboard() : string {
+		ob_start();
+		?>
+
+		#dashboard-widgets-wrap #what-git-branch .inside {
+			display: flex;
+			gap: 1rem;
+			align-items: stretch;
+		}
+
+		#dashboard-widgets-wrap #what-git-branch .inside::before {
+			content: '';
+			width: 0;
+			border: 0.5px solid #d3d3d3;
+		}
+
+		#dashboard-widgets-wrap #what-git-branch .inside > div {
+			width: 50%;
+			order: 1;
+		}
+
+		#dashboard-widgets-wrap #what-git-branch .inside code {
+			display: block;
+			user-select: all;
+			white-space: nowrap;
+			overflow: hidden;
+			font-size: 0.8em;
+		}
+
+		<?php
+		return trim( ob_get_clean() );
+	}
+
+	/**
+	 * Check if Heartbeat API is needed.
+	 * 
+	 * Heartbeat API is used to periodically check the git branch,
+	 * and update the branch name in the admin bar and Dashboard widget.
+	 * 
+	 * @return bool
+	 */
+	protected function needs_heartbeat() : bool {
+		if ( empty( $this->git_dir ) ) {
+			return false;
+		}
+
+		if ( is_admin_bar_showing() ) {
+			return true;
+		}
+
+		return function_exists( 'get_current_screen' ) && 'dashboard' === get_current_screen()->id;
 	}
 
 	/**
@@ -286,15 +396,9 @@ class CSSLLC_What_Git_Branch {
 			return;
 		}
 
-		if ( 
-			   ! is_admin_bar_showing() 
-			&& ! wp_doing_ajax() 
-		) {
-			return;
-		}
-
 		add_action( 'wp_enqueue_scripts',    array( $this, 'action__wp_enqueue_scripts' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'action__admin_enqueue_scripts' ) );
+		add_action( 'wp_dashboard_setup',    array( $this, 'action__wp_dashboard_setup' ) );
 		add_action( 'admin_bar_menu',        array( $this, 'action__admin_bar_menu' ), 5000 );
 
 		if ( empty( $this->git_dir ) ) {
@@ -332,6 +436,21 @@ class CSSLLC_What_Git_Branch {
 		}
 
 		$this->enqueue_assets();
+	}
+
+	/**
+	 * Action: wp_dashboard_setup
+	 * 
+	 * @uses $this->register_dashboard_widget()
+	 * 
+	 * @return void
+	 */
+	public function action__wp_dashboard_setup() : void {
+		if ( 'wp_dashboard_setup' !== current_action() ) {
+			return;
+		}
+
+		$this->register_dashboard_widget();
 	}
 
 	/**
