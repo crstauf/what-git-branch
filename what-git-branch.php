@@ -16,7 +16,6 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 
 /**
  * @todo add log of branch changes to dashboard widget
- * @todo update GitHub links on Heartbeat receive
  */
 class CSSLLC_What_Git_Branch {
 
@@ -144,13 +143,12 @@ class CSSLLC_What_Git_Branch {
 		}
 
 		$head_ref = file_get_contents( $this->git_dir . '.git/HEAD' );
-		$head_ref = sanitize_text_field( $head_ref );
 
 		if ( false === $head_ref ) {
 			return;
 		}
 
-		$this->head_ref = $head_ref;
+		$this->head_ref = sanitize_text_field( $head_ref );
 	}
 
 	/**
@@ -180,7 +178,7 @@ class CSSLLC_What_Git_Branch {
 
 			$this->git_dir = trailingslashit( dirname( $path ) );
 			
-			break; // supports one git repo
+			break; // only one git repo
 		}
 	}
 
@@ -201,6 +199,7 @@ class CSSLLC_What_Git_Branch {
 	 * @see $this->register_dashboard_widget()
 	 * 
 	 * @uses $this->get_head_ref()
+	 * @uses $this->get_github_url()
 	 * 
 	 * @return void
 	 */
@@ -219,7 +218,7 @@ class CSSLLC_What_Git_Branch {
 				. '<code class="what-git-branch">' . esc_html( $head_ref ) . '</code>';
 
 				if ( ! empty( $this->get_github_url() ) ) { 
-					echo '<a href="' . esc_url( $this->get_github_url() ) . '">View on GitHub</a>';
+					echo '<a class="what-git-branch-github" href="' . esc_url( $this->get_github_url() ) . '">View on GitHub</a>';
 				}
 			
 			echo '</p>'
@@ -317,8 +316,6 @@ class CSSLLC_What_Git_Branch {
 
 		#dashboard-widgets-wrap #what-git-branch .inside a {
 			float: right;
-			display: inline-block;
-			line-height: 1.9em;
 			font-size: 0.8em;
 		}
 
@@ -367,6 +364,7 @@ class CSSLLC_What_Git_Branch {
 		( function() {
 		
 			var heartbeat_key = <?php echo json_encode( self::HEARTBEAT_KEY ) ?>;
+			var heartbeat_data;
 
 			jQuery( document ).on( 'heartbeat-send', function ( ev, data ) {
 				data[ heartbeat_key ] = true;
@@ -377,8 +375,14 @@ class CSSLLC_What_Git_Branch {
 					return;
 				}
 
+				heartbeat_data = data[ heartbeat_key ];
+
 				document.querySelectorAll( '.what-git-branch' ).forEach( function( el ) {
-					el.innerText = data[ heartbeat_key ]
+					el.innerText = heartbeat_data.head_ref;
+				} );
+
+				document.querySelectorAll( '#wp-admin-bar-what-git-branch > a, a.what-git-branch-github' ).forEach( function( el ) {
+					el.setAttribute( 'href', heartbeat_data.github_url );
 				} );
 			} );
 
@@ -392,6 +396,7 @@ class CSSLLC_What_Git_Branch {
 	 * Get head reference.
 	 * 
 	 * @uses $this->set_head_ref()
+	 * @uses $this->is_branch()
 	 * @uses $this->get_branch()
 	 * 
 	 * @return string
@@ -434,8 +439,6 @@ class CSSLLC_What_Git_Branch {
 	/**
 	 * Check if head reference is a branch.
 	 * 
-	 * @uses $this->get_head_ref()
-	 * 
 	 * @return bool
 	 */
 	public function is_branch() : bool {
@@ -455,6 +458,8 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Get URL to head reference on GitHub.
+	 * 
+	 * @uses $this->get_head_ref()
 	 * 
 	 * @return string
 	 */
@@ -554,6 +559,7 @@ class CSSLLC_What_Git_Branch {
 	 * @param WP_Admin_Bar $bar (reference)
 	 * 
 	 * @uses $this->get_head_ref()
+	 * @uses $this->get_github_url()
 	 * 
 	 * @return void
 	 */
@@ -575,8 +581,10 @@ class CSSLLC_What_Git_Branch {
 			),
 		);
 
-		if ( ! empty( $this->get_github_url() ) ) {
-			$args['href'] = $this->get_github_url();
+		$github_url = $this->get_github_url();
+
+		if ( ! empty( $github_url ) ) {
+			$args['href'] = $github_url;
 
 			unset( $args['meta']['onclick'] );
 		}
@@ -591,6 +599,7 @@ class CSSLLC_What_Git_Branch {
 	 * @param array $data
 	 * 
 	 * @uses $this->get_head_ref()
+	 * @uses $this->get_github_url()
 	 * 
 	 * @return array
 	 */
@@ -599,7 +608,10 @@ class CSSLLC_What_Git_Branch {
 			return $response;
 		}
 
-		$response[ self::HEARTBEAT_KEY ] = $this->get_head_ref();
+		$response[ self::HEARTBEAT_KEY ] = array(
+			'head_ref'   => $this->get_head_ref(),
+			'github_url' => $this->get_github_url(),
+		);
 
 		return $response;
 	}
