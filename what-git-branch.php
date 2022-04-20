@@ -233,10 +233,10 @@ class CSSLLC_What_Git_Branch {
 			echo '</p>'
 		. '</div>';
 
-		if ( empty( $this->git_dir ) ) {
+		if ( ! empty( $this->external_file ) ) {
 			echo '<div>'
 				. '<h3>External File</h3>'
-				. '<p><code>' . esc_html( str_replace( ABSPATH , '/', $this->external_file ) ) . '</code></p>'
+				. '<p><code>' . esc_html( str_replace( ABSPATH , '', $this->external_file ) ) . '</code></p>'
 			. '</div>';
 
 			return;
@@ -244,7 +244,7 @@ class CSSLLC_What_Git_Branch {
 
 		echo '<div>'
 			. '<h3>Git directory</h3>'
-			. '<p><code>' . esc_html( str_replace( ABSPATH , '/', $this->git_dir ) ) . '</code></p>'
+			. '<p><code>' . esc_html( str_replace( ABSPATH , '', $this->git_dir ) ) . '</code></p>'
 		. '</div>';
 	}
 
