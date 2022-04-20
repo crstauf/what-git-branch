@@ -30,7 +30,7 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Initialize.
-	 * 
+	 *
 	 * @return void
 	 */
 	public static function init() : void {
@@ -73,7 +73,7 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Set paths to search for git repo.
-	 * 
+	 *
 	 * @return void
 	 */
 	protected function set_search_paths() : void {
@@ -88,13 +88,13 @@ class CSSLLC_What_Git_Branch {
 
 		$this->search_paths = $paths;
 	}
-	
+
 	/**
 	 * Set head reference.
-	 * 
+	 *
 	 * @uses $this->set_head_ref_by_file()
 	 * @uses $this->set_head_ref_by_repo()
-	 * 
+	 *
 	 * @return void
 	 */
 	protected function set_head_ref() : void {
@@ -103,13 +103,13 @@ class CSSLLC_What_Git_Branch {
 		if ( ! empty( $this->head_ref ) ) {
 			return;
 		}
-		
+
 		$this->set_head_ref_by_repo();
 	}
-	
+
 	/**
 	 * Set head reference from file in searchable paths.
-	 * 
+	 *
 	 * @return void
 	 */
 	protected function set_head_ref_by_file() : void {
@@ -141,7 +141,7 @@ class CSSLLC_What_Git_Branch {
 	 * Set head reference from git repository data.
 	 *
 	 * @uses $this->find_repo_dir()
-	 * 
+	 *
 	 * @return void
 	 */
 	protected function set_head_ref_by_repo() : void {
@@ -162,7 +162,7 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Find repository directory.
-	 * 
+	 *
 	 * @return void
 	 */
 	protected function find_repo_dir() : void {
@@ -186,16 +186,16 @@ class CSSLLC_What_Git_Branch {
 			}
 
 			$this->git_dir = trailingslashit( dirname( $path ) );
-			
+
 			break; // only one git repo
 		}
 	}
 
 	/**
 	 * Register Dashboard widget.
-	 * 
+	 *
 	 * @uses wp_add_dashboard_widget()
-	 * 
+	 *
 	 * @return void
 	 */
 	protected function register_dashboard_widget() : void {
@@ -204,12 +204,12 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Callback: wp_add_dashboard_widget()
-	 * 
+	 *
 	 * @see $this->register_dashboard_widget()
-	 * 
+	 *
 	 * @uses $this->get_head_ref()
 	 * @uses $this->get_github_url()
-	 * 
+	 *
 	 * @return void
 	 */
 	public function callback__dashboard_widget() : void {
@@ -226,10 +226,10 @@ class CSSLLC_What_Git_Branch {
 			. '<p>'
 				. '<code class="what-git-branch">' . esc_html( $head_ref ) . '</code>';
 
-				if ( ! empty( $this->get_github_url() ) ) { 
+				if ( ! empty( $this->get_github_url() ) ) {
 					echo '<a class="what-git-branch-github" href="' . esc_url( $this->get_github_url() ) . '">View on GitHub</a>';
 				}
-			
+
 			echo '</p>'
 		. '</div>';
 
@@ -250,12 +250,12 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Enqueue assets.
-	 * 
+	 *
 	 * @uses $this->add_inline_style__admin_bar()
 	 * @uses $this->add_inline_style__dashboard()
 	 * @uses $this->needs_heartbeat()
 	 * @uses $this->add_inline_script__heartbeat()
-	 * 
+	 *
 	 * @return void
 	 */
 	protected function enqueue_assets() : void {
@@ -263,13 +263,13 @@ class CSSLLC_What_Git_Branch {
 			wp_add_inline_style( 'admin-bar', $this->add_inline_style__admin_bar() );
 		}
 
-		if ( 
-			 function_exists( 'get_current_screen' ) 
-			&& 'dashboard' === get_current_screen()->id 
+		if (
+			 function_exists( 'get_current_screen' )
+			&& 'dashboard' === get_current_screen()->id
 		) {
 			wp_add_inline_style( 'dashboard', $this->add_inline_style__dashboard() );
 		}
-		
+
 		if ( ! $this->needs_heartbeat() ) {
 			return;
 		}
@@ -280,7 +280,7 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Add inline styles to admin-bar stylesheet.
-	 * 
+	 *
 	 * @return string
 	 */
 	protected function add_inline_style__admin_bar() : string {
@@ -343,10 +343,10 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Check if Heartbeat API is needed.
-	 * 
+	 *
 	 * Heartbeat API is used to periodically check the git branch,
 	 * and update the branch name in the admin bar and Dashboard widget.
-	 * 
+	 *
 	 * @return bool
 	 */
 	protected function needs_heartbeat() : bool {
@@ -363,7 +363,7 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Add inline script to heartbeat script.
-	 * 
+	 *
 	 * @return string
 	 */
 	protected function add_inline_script__heartbeat() : string {
@@ -371,7 +371,7 @@ class CSSLLC_What_Git_Branch {
 		?>
 
 		( function() {
-		
+
 			var heartbeat_key = <?php echo json_encode( self::HEARTBEAT_KEY ) ?>;
 			var heartbeat_data;
 
@@ -403,11 +403,11 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Get head reference.
-	 * 
+	 *
 	 * @uses $this->set_head_ref()
 	 * @uses $this->is_branch()
 	 * @uses $this->get_branch()
-	 * 
+	 *
 	 * @return string
 	 */
 	public function get_head_ref() : string {
@@ -424,9 +424,9 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Get branch name.
-	 * 
+	 *
 	 * @uses $this->is_branch()
-	 * 
+	 *
 	 * @return string
 	 */
 	protected function get_branch() : string {
@@ -447,7 +447,7 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Check if head reference is a branch.
-	 * 
+	 *
 	 * @return bool
 	 */
 	public function is_branch() : bool {
@@ -456,9 +456,9 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Check if head reference is a commit.
-	 * 
+	 *
 	 * @uses $this->is_branch()
-	 * 
+	 *
 	 * @return bool
 	 */
 	public function is_commit() : bool {
@@ -467,9 +467,9 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Get URL to head reference on GitHub.
-	 * 
+	 *
 	 * @uses $this->get_head_ref()
-	 * 
+	 *
 	 * @return string
 	 */
 	protected function get_github_url() : string {
@@ -485,7 +485,7 @@ class CSSLLC_What_Git_Branch {
 			return '';
 		}
 
-		return sprintf( 
+		return sprintf(
 			'https://github.com/%s/tree/%s',
 			sanitize_text_field( $github_repo ),
 			sanitize_text_field( $this->get_head_ref() )
@@ -494,9 +494,9 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Action: wp_enqueue_scripts
-	 * 
+	 *
 	 * @uses $this->enqueue_assets()
-	 * 
+	 *
 	 * @return void
 	 */
 	public function action__wp_enqueue_scripts() : void {
@@ -509,9 +509,9 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Action: admin_enqueue_scripts
-	 * 
+	 *
 	 * @uses $this->enqueue_assets()
-	 * 
+	 *
 	 * @return void
 	 */
 	public function action__admin_enqueue_scripts() : void {
@@ -524,9 +524,9 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Action: wp_dashboard_setup
-	 * 
+	 *
 	 * @uses $this->register_dashboard_widget()
-	 * 
+	 *
 	 * @return void
 	 */
 	public function action__wp_dashboard_setup() : void {
@@ -539,12 +539,12 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Action: admin_bar_menu
-	 * 
+	 *
 	 * @param WP_Admin_Bar $bar (reference)
-	 * 
+	 *
 	 * @uses $this->get_head_ref()
 	 * @uses $this->get_github_url()
-	 * 
+	 *
 	 * @return void
 	 */
 	public function action__admin_bar_menu( WP_Admin_Bar $bar ) : void {
@@ -554,10 +554,10 @@ class CSSLLC_What_Git_Branch {
 
 		$args = array(
 			'id'     => 'what-git-branch',
-			'title'  => sprintf( 
-				'<span class="what-git-branch" title="%s">%s</span>', 
+			'title'  => sprintf(
+				'<span class="what-git-branch" title="%s">%s</span>',
 				esc_html( $this->git_dir ),
-				esc_html( $this->get_head_ref() ) 
+				esc_html( $this->get_head_ref() )
 			),
 			'parent' => false,
 			'meta'   => array(
@@ -578,13 +578,13 @@ class CSSLLC_What_Git_Branch {
 
 	/**
 	 * Action: heartbeat_received
-	 * 
+	 *
 	 * @param mixed $response
 	 * @param array $data
-	 * 
+	 *
 	 * @uses $this->get_head_ref()
 	 * @uses $this->get_github_url()
-	 * 
+	 *
 	 * @return array
 	 */
 	public function action__heartbeat_received( $response, array $data ) {
@@ -603,9 +603,9 @@ class CSSLLC_What_Git_Branch {
 }
 
 add_action( 'init', static function() : void {
-	if ( 
-		'production' === wp_get_environment_type() 
-		|| ! current_user_can( 'manage_options' ) 
+	if (
+		'production' === wp_get_environment_type()
+		|| ! current_user_can( 'manage_options' )
 	) {
 		return;
 	}
