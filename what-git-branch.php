@@ -369,7 +369,7 @@ class CSSLLC_What_Git_Branch {
 
 		$github_repo = apply_filters( 'what_git_branch/github_repo', $github_repo );
 
-		if ( 0 && ! empty( $github_repo ) ) {
+		if ( ! empty( $github_repo ) ) {
 			unset( $args['meta']['onclick'] );
 
 			$args['href'] = sprintf( 
