@@ -16,8 +16,6 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 
 /**
  * @todo introduce support for link to branch on GitHub
- * @todo add bash script to write current branch to file (`git rev-parse --abbrev-ref HEAD`)
- * @todo add support for reading file created by bash script
  * @todo add support to copy branch name to clipboard on admin bar node click
  */
 class CSSLLC_What_Git_Branch {
