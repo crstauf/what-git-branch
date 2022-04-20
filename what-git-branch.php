@@ -59,7 +59,16 @@ class CSSLLC_What_Git_Branch {
 			return;
 		}
 
-		add_action( 'init', array( $this, 'action__init' ) );
+		add_action( 'wp_enqueue_scripts',    array( $this, 'action__wp_enqueue_scripts' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'action__admin_enqueue_scripts' ) );
+		add_action( 'wp_dashboard_setup',    array( $this, 'action__wp_dashboard_setup' ) );
+		add_action( 'admin_bar_menu',        array( $this, 'action__admin_bar_menu' ), 5000 );
+
+		if ( empty( $this->git_dir ) ) {
+			return;
+		}
+
+		add_action( 'heartbeat_received', array( $this, 'action__heartbeat_received' ), 10, 2 );
 	}
 
 	/**
@@ -484,31 +493,6 @@ class CSSLLC_What_Git_Branch {
 	}
 
 	/**
-	 * Action: init
-	 * 
-	 * @return void
-	 */
-	public function action__init() : void {
-		if ( 
-			'init' !== current_action() 
-			|| ! current_user_can( 'manage_options' )
-		) {
-			return;
-		}
-
-		add_action( 'wp_enqueue_scripts',    array( $this, 'action__wp_enqueue_scripts' ) );
-		add_action( 'admin_enqueue_scripts', array( $this, 'action__admin_enqueue_scripts' ) );
-		add_action( 'wp_dashboard_setup',    array( $this, 'action__wp_dashboard_setup' ) );
-		add_action( 'admin_bar_menu',        array( $this, 'action__admin_bar_menu' ), 5000 );
-
-		if ( empty( $this->git_dir ) ) {
-			return;
-		}
-
-		add_action( 'heartbeat_received', array( $this, 'action__heartbeat_received' ), 10, 2 );
-	}
-
-	/**
 	 * Action: wp_enqueue_scripts
 	 * 
 	 * @uses $this->enqueue_assets()
@@ -618,4 +602,13 @@ class CSSLLC_What_Git_Branch {
 
 }
 
-CSSLLC_What_Git_Branch::init();
+add_action( 'init', static function() : void {
+	if ( 
+		'production' === wp_get_environment_type() 
+		|| ! current_user_can( 'manage_options' ) 
+	) {
+		return;
+	}
+
+	CSSLLC_What_Git_Branch::init();
+} );
