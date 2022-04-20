@@ -16,7 +16,6 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 
 /**
  * @todo add log of branch changes to dashboard widget
- * @todo trim commit hash if commit checked out
  */
 class CSSLLC_What_Git_Branch {
 
