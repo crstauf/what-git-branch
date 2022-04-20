@@ -23,6 +23,7 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 class CSSLLC_What_Git_Branch {
 
 	public const HEARTBEAT_KEY = 'what_git_branch';
+	public const EXTERNAL_FILE = '.what-git-branch';
 
 	protected $search_paths = array();
 	protected $git_dir = '';
@@ -75,37 +76,6 @@ class CSSLLC_What_Git_Branch {
 		$paths = array_unique( $paths );
 
 		$this->search_paths = $paths;
-	}
-
-	/**
-	 * Find repository directory.
-	 * 
-	 * @return void
-	 */
-	protected function find_repo_dir() : void {
-		if ( ! empty( $this->git_dir ) ) {
-			return;
-		}
-		
-		if ( empty( $this->search_paths ) ) {
-			return;
-		}
-
-		foreach ( $this->search_paths as $i => $path ) {
-			$path .= '.git/';
-
-			if (
-				   ! file_exists( $path )
-				|| ! is_dir( $path )
-				|| ! file_exists( $path . 'HEAD' )
-			) {
-				continue;
-			}
-
-			$this->git_dir = $this->search_paths[ $i ];
-			
-			break; // supports one git repo
-		}
 	}
 
 	/**
@@ -195,22 +165,96 @@ class CSSLLC_What_Git_Branch {
 	 * @todo check external file
 	 */
 	protected function set_current_branch() : void {
+		$this->set_branch_by_file();
+
+		if ( ! empty( $this->current_branch ) ) {
+			return;
+		}
+
+		$this->set_branch_by_repo();
+	}
+
+	/**
+	 * Set branch from file in searchable paths.
+	 * 
+	 * @return void
+	 */
+	protected function set_branch_by_file() : void {
+		if ( empty( $this->search_paths ) ) {
+			return;
+		}
+
+		foreach ( $this->search_paths as $path ) {
+			$path .= self::EXTERNAL_FILE;
+
+			if ( ! file_exists( $path ) ) {
+				continue;
+			}
+
+			$external_file = file_get_contents( $path );
+
+			break;
+		}
+
+		if ( empty( $external_file ) ) {
+			return;
+		}
+
+		$this->current_branch = sanitize_text_field( $external_file );
+	}
+
+	/**
+	 * Set branch from git repository data.
+	 * 
+	 * @return void
+	 */
+	protected function set_branch_by_repo() : void {
 		$this->find_repo_dir();
 
 		if ( empty( $this->git_dir ) ) {
-			$this->current_branch = 'N/A';
 			return;
 		}
 
 		$head = file_get_contents( $this->git_dir . '.git/HEAD' );
+		$head = sanitize_text_field( $head );
 
 		if ( false === $head ) {
-			$this->current_branch = 'N/A';
 			return;
 		}
 
 		$pos = strripos( $head, '/' );
 		$this->current_branch = trim( substr( $head, ( $pos + 1 ) ) );
+	}
+
+	/**
+	 * Find repository directory.
+	 * 
+	 * @return void
+	 */
+	protected function find_repo_dir() : void {
+		if ( ! empty( $this->git_dir ) ) {
+			return;
+		}
+
+		if ( empty( $this->search_paths ) ) {
+			return;
+		}
+
+		foreach ( $this->search_paths as $i => $path ) {
+			$path .= '.git/';
+
+			if (
+				   ! file_exists( $path )
+				|| ! is_dir( $path )
+				|| ! file_exists( $path . 'HEAD' )
+			) {
+				continue;
+			}
+
+			$this->git_dir = $this->search_paths[ $i ];
+			
+			break; // supports one git repo
+		}
 	}
 
 	/**
