@@ -41,5 +41,5 @@ In a GitHub Action, this may look similar to this (depending on your deploy proc
 jobs:
   job-name:
     steps:
-      - run: git rev-parse --abbrev-ref HEAD > .what-git-branch
+      - run: echo ${GITUHB_REF#refs/heads/} > .what-git-branch
 ```

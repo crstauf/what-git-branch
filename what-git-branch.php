@@ -15,8 +15,6 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 }
 
 /**
- * @todo introduce support for link to branch on GitHub
- * @todo add support to copy branch name to clipboard on admin bar node click
  * @todo add dashboard widget
  * @todo add log of branch changes to dashboard widget
  */
@@ -178,7 +176,7 @@ class CSSLLC_What_Git_Branch {
 				continue;
 			}
 
-			$this->git_dir = dirname( $path );
+			$this->git_dir = trailingslashit( dirname( $path ) );
 			
 			break; // supports one git repo
 		}
@@ -221,14 +219,6 @@ class CSSLLC_What_Git_Branch {
 			background-size: auto 50%;
 			font-family: Consolas, Monaco, monospace;
 			line-height: 30px;
-		}
-
-		#wpadminbar .ab-top-menu > li#wp-admin-bar-what-git-branch.hover > .ab-item, 
-		#wpadminbar.nojq .quicklinks .ab-top-menu > li#wp-admin-bar-what-git-branch > .ab-item:focus, 
-		#wpadminbar:not( .mobile ) .ab-top-menu > li#wp-admin-bar-what-git-branch:hover >.ab-item, 
-		#wpadminbar:not( .mobile ) .ab-top-menu > li#wp-admin-bar-what-git-branch > .ab-item:focus {
-			background: transparent;
-			color: #f0f0f1;
 		}
 
 		<?php
@@ -296,15 +286,22 @@ class CSSLLC_What_Git_Branch {
 			return;
 		}
 
-		add_action( 'heartbeat_received', array( $this, 'action__heartbeat_received' ), 10, 2 );
-
-		if ( ! is_admin_bar_showing() ) {
+		if ( 
+			   ! is_admin_bar_showing() 
+			&& ! wp_doing_ajax() 
+		) {
 			return;
 		}
 
 		add_action( 'wp_enqueue_scripts',    array( $this, 'action__wp_enqueue_scripts' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'action__admin_enqueue_scripts' ) );
 		add_action( 'admin_bar_menu',        array( $this, 'action__admin_bar_menu' ), 5000 );
+
+		if ( empty( $this->git_dir ) ) {
+			return;
+		}
+
+		add_action( 'heartbeat_received', array( $this, 'action__heartbeat_received' ), 10, 2 );
 	}
 
 	/**
@@ -358,9 +355,29 @@ class CSSLLC_What_Git_Branch {
 				esc_html( $this->git_dir ),
 				esc_html( $this->get_current_branch() ) 
 			),
-			'href'   => false,
 			'parent' => false,
+			'meta'   => array(
+				'onclick' => 'if ( navigator.clipboard) { navigator.clipboard.writeText( "' . $this->get_current_branch() . '" ).then( () => { alert( "Copied branch name." ) } ) }',
+			),
 		);
+
+		$github_repo = '';
+
+		if ( defined( 'WHAT_GIT_BRANCH_GITHUB_REPO' ) ) {
+			$github_repo = constant( 'WHAT_GIT_BRANCH_GITHUB_REPO' );
+		}
+
+		$github_repo = apply_filters( 'what_git_branch/github_repo', $github_repo );
+
+		if ( 0 && ! empty( $github_repo ) ) {
+			unset( $args['meta']['onclick'] );
+
+			$args['href'] = sprintf( 
+				'https://github.com/%s/tree/%s',
+				sanitize_text_field( $github_repo ),
+				sanitize_text_field( $this->get_current_branch() )
+			);
+		}
 
 		$bar->add_node( $args );
 	}
@@ -376,10 +393,7 @@ class CSSLLC_What_Git_Branch {
 	 * @return array
 	 */
 	public function action__heartbeat_received( $response, array $data ) {
-		if ( 
-			   empty( $this->git_dir )
-			|| empty( $data[ self::HEARTBEAT_KEY ] ) 
-		) {
+		if ( empty( $data[ self::HEARTBEAT_KEY ] ) ) {
 			return $response;
 		}
 
