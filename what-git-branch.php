@@ -1,8 +1,7 @@
 <?php
 /*
 Plugin Name: What Git Branch?
-Plugin URI:
-Description:
+Plugin URI: https://github.com/crstauf/what-git-branch
 Version: 1.0.0
 Author: Caleb Stauffer
 Author URI: https://develop.calebstauffer.com
