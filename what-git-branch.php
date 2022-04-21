@@ -15,6 +15,7 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 
 /**
  * @todo add log of branch changes to dashboard widget
+ * @todo add WP CLI command
  */
 class CSSLLC_What_Git_Branch {
 
