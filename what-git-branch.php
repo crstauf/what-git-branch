@@ -7,8 +7,6 @@ Author: Caleb Stauffer
 Author URI: https://develop.calebstauffer.com
 */
 
-use WP_CLI\Utils\get_flag_value;
-
 if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 	header( 'Status: 403 Forbidden' );
 	header( 'HTTP/1.1 403 Forbidden' );
@@ -18,7 +16,6 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 /**
  * @todo add log of branch changes to dashboard widget
  * @todo add WP CLI command DocBlocks
- * @todo test WP CLI commands
  */
 class CSSLLC_What_Git_Branch {
 
@@ -282,22 +279,29 @@ class CSSLLC_What_Git_Branch {
 	 * CLI command: identify
 	 *
 	 * @uses $this->set_head_ref()
+	 * @uses $this->is_branch()
+	 * @uses $this->get_branch()
 	 *
 	 * @return void
 	 */
-	public function cli__identify() : void {
+	public function cli__identify( array $args = array(), array $assoc_args = array() ) : void {
 		$this->set_head_ref();
 
 		if ( empty( $this->head_ref ) ) {
 			WP_CLI::error( 'Could not identify head reference.' );
 		}
 
+		$ref = $this->get_branch();
+
 		if ( ! $this->is_branch() ) {
-			WP_CLI::line( $this->head_ref );
-			return;
+			$ref = $this->head_ref;
 		}
 
-		WP_CLI::line( $this->get_branch() );
+		WP_CLI::line( $ref );
+
+		if ( !! WP_CLI\Utils\get_flag_value( $assoc_args, 'git-dir', false ) ) {
+			WP_CLI::line( $this->git_dir );
+		}
 	}
 
 	/**
