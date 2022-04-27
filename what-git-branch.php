@@ -292,7 +292,12 @@ class CSSLLC_What_Git_Branch {
 			WP_CLI::error( 'Could not identify head reference.' );
 		}
 
-		WP_CLI::line( $this->head_ref );
+		if ( ! $this->is_branch() ) {
+			WP_CLI::line( $this->head_ref );
+			return;
+		}
+
+		WP_CLI::line( $this->get_branch() );
 	}
 
 	/**
