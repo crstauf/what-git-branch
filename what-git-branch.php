@@ -7,6 +7,8 @@ Author: Caleb Stauffer
 Author URI: https://develop.calebstauffer.com
 */
 
+use WP_CLI\Utils\get_flag_value;
+
 if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 	header( 'Status: 403 Forbidden' );
 	header( 'HTTP/1.1 403 Forbidden' );
@@ -15,7 +17,8 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 
 /**
  * @todo add log of branch changes to dashboard widget
- * @todo add WP CLI command
+ * @todo add WP CLI command DocBlocks
+ * @todo test WP CLI commands
  */
 class CSSLLC_What_Git_Branch {
 
@@ -55,6 +58,7 @@ class CSSLLC_What_Git_Branch {
 	protected function __construct() {
 		$this->set_search_paths();
 		$this->set_head_ref();
+		$this->register_cli_commands();
 
 		if ( empty( $this->head_ref ) ) {
 			return;
@@ -190,6 +194,105 @@ class CSSLLC_What_Git_Branch {
 
 			break; // only one git repo
 		}
+	}
+	
+	/**
+	 * Register CLI commands.
+	 *
+	 * @return void
+	 */
+	protected function register_cli_commands() : void {
+		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+			return;
+		}
+		
+		WP_CLI::add_command( 'whatgitbranch set', array( $this, 'cli__set' ) );
+		WP_CLI::add_command( 'whatgitbranch reset', array( $this, 'cli__reset' ) );
+		WP_CLI::add_command( 'whatgitbranch identify', array( $this, 'cli__identify' ) );
+	}
+	
+	/**
+	 * CLI command: set
+	 *
+	 * @uses $this->set_head_ref_by_file()
+	 *
+	 * @return void
+	 */
+	public function cli__set( array $args ) : void {
+		if ( empty( $args[0] ) ) {
+			WP_CLI::error( 'Branch name is required.' );
+			return;
+		}
+		
+		$this->set_head_ref_by_file();
+		
+		$ref = ( string ) $args[0];
+		$path = $this->external_file;
+		
+		if ( empty( $path ) ) {
+			$path = $this->search_paths[0] . self::EXTERNAL_FILE;
+		}
+		
+		WP_CLI::debug( sprintf( 'Writing to file: %s', $path );
+		
+		$result = file_put_contents( $path, $ref );
+		
+		if ( false === $result ) {
+			WP_CLI::error( 'Unable to set branch name.' );
+		}
+		
+		WP_CLI::debug( sprintf( 'Bytes written: %d', $result ) );
+		
+		WP_CLI::success( 'Set branch name.' );
+	}
+	
+	/**
+	 * CLI command: reset
+	 *
+	 * @uses $this->set_head_ref_by_file()
+	 *
+	 * @return void
+	 */
+	public function cli__reset() : void {
+		$this->set_head_ref_by_file();
+		
+		if ( empty( $this->external_file ) ) {
+			WP_CLI::warning( 'External file does not exist.' );
+			return;
+		}
+		
+		WP_CLI::debug( sprintf( 'Filepath: %s', $this->external_file ) );
+		
+		if ( ! file_exists( $this->external_file ) ) {
+			WP_CLI::error( 'External file disappeared.' );
+			return;
+		}
+		
+		$result = unlink( $this->external_file );
+		
+		if ( empty( $result ) ) {
+			WP_CLI::error( 'Unable to delete external file.' );
+			return;
+		}
+		
+		WP_CLI::success( 'Reset the head ref.' );
+	}
+	
+	/**
+	 * CLI command: identify
+	 *
+	 * @uses $this->set_head_ref()
+	 *
+	 * @return void
+	 */
+	public function cli__identify() : void {
+		$this->set_head_ref();
+		
+		if ( empty( $this->head_ref ) ) {
+			WP_CLI::error( 'Could not identify head reference.' );
+		}
+		
+		WP_CLI::line( $this->head_ref );
 	}
 
 	/**
@@ -633,3 +736,9 @@ add_action( 'init', static function() : void {
 
 	CSSLLC_What_Git_Branch::init();
 } );
+
+if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+	return;
+}
+
+CSSLLC_What_Git_Branch::init();
