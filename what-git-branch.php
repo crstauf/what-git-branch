@@ -206,6 +206,7 @@ class CSSLLC_What_Git_Branch {
 		WP_CLI::add_command( 'whatgitbranch set', array( $this, 'cli__set' ) );
 		WP_CLI::add_command( 'whatgitbranch reset', array( $this, 'cli__reset' ) );
 		WP_CLI::add_command( 'whatgitbranch identify', array( $this, 'cli__identify' ) );
+		WP_CLI::add_command( 'whatgitbranch identify-path', array( $this, 'cli__identify_path' ) );
 	}
 
 	/**
@@ -279,12 +280,12 @@ class CSSLLC_What_Git_Branch {
 	 * CLI command: identify
 	 *
 	 * @uses $this->set_head_ref()
-	 * @uses $this->is_branch()
 	 * @uses $this->get_branch()
+	 * @uses $this->is_branch()
 	 *
 	 * @return void
 	 */
-	public function cli__identify( array $args = array(), array $assoc_args = array() ) : void {
+	public function cli__identify() : void {
 		$this->set_head_ref();
 
 		if ( empty( $this->head_ref ) ) {
@@ -298,10 +299,32 @@ class CSSLLC_What_Git_Branch {
 		}
 
 		WP_CLI::line( $ref );
+	}
+	
+	/**
+	 * CLI command: identify-path
+	 *
+	 * @uses $this->set_head_ref()
+	 *
+	 * @return void
+	 */
+	public function cli__identify_path() : void {
+		$this->set_head_ref();
 
-		if ( !! WP_CLI\Utils\get_flag_value( $assoc_args, 'git-dir', false ) ) {
-			WP_CLI::line( $this->git_dir );
+		if ( empty( $this->head_ref ) ) {
+			WP_CLI::error( 'Could not identify head reference.' );
 		}
+
+		if ( empty( $this->git_dir ) ) && empty( $this->external_file ) ) {
+			WP_CLI::error( 'Path to git directory or external file not found.' );
+		}
+
+		if ( ! empty( $this->git_dir ) ) {
+			WP_CLI::line( $this->git_dir );
+			return;
+		}
+
+		WP_CLI::line( $this->external_file );
 	}
 
 	/**
