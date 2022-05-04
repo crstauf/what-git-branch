@@ -51,6 +51,7 @@ class CSSLLC_What_Git_Branch {
 	 *
 	 * @uses $this->set_search_paths()
 	 * @uses $this->set_head_ref()
+	 * @uses $this->register_cli_commands()
 	 */
 	protected function __construct() {
 		$this->set_search_paths();
