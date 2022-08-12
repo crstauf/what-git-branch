@@ -624,8 +624,14 @@ class CSSLLC_What_Git_Branch {
 }
 
 add_action( 'init', static function() : void {
+	$environment = apply_filters(
+		'what_git_branch/get_environment',
+		function_exists( 'wp_get_environment_type' ) && defined( 'WP_ENVIRONMENT_TYPE' ) ? wp_get_environment_type() : 'local'
+	);
+	$production  = apply_filters( 'what_git_branch/production_environment', 'production' );
+
 	if (
-		'production' === wp_get_environment_type()
+		$production === $environment
 		|| ! current_user_can( 'manage_options' )
 	) {
 		return;
