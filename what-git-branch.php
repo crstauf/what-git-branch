@@ -265,7 +265,8 @@ class CSSLLC_What_Git_Branch {
 		}
 
 		if (
-			 function_exists( 'get_current_screen' )
+			function_exists( 'get_current_screen' )
+			&& is_a( get_current_screen(), WP_Screen::class )
 			&& 'dashboard' === get_current_screen()->id
 		) {
 			wp_add_inline_style( 'dashboard', $this->add_inline_style__dashboard() );
