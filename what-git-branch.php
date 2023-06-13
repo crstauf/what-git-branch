@@ -637,7 +637,9 @@ class CSSLLC_What_Git_Branch {
 			$github_repo = constant( 'WHAT_GIT_BRANCH_GITHUB_REPO' );
 		}
 
-		$github_repo = apply_filters( 'what_git_branch/github_repo', $github_repo );
+		$this->find_repo_dir();
+
+		$github_repo = apply_filters( 'what_git_branch/github_repo', $github_repo, $this->git_dir );
 
 		if ( empty( $github_repo ) ) {
 			return '';
