@@ -200,7 +200,7 @@ class CSSLLC_What_Git_Branch {
 	 * @return void
 	 */
 	protected function register_cli_commands() : void {
-		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+		if ( ! defined( 'WP_CLI' ) || ! constant( 'WP_CLI' ) ) {
 			return;
 		}
 
@@ -301,7 +301,7 @@ class CSSLLC_What_Git_Branch {
 
 		WP_CLI::line( $ref );
 	}
-	
+
 	/**
 	 * CLI command: identify-path
 	 *
@@ -770,7 +770,7 @@ add_action( 'init', static function() : void {
 	CSSLLC_What_Git_Branch::init();
 } );
 
-if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+if ( ! defined( 'WP_CLI' ) || ! constant( 'WP_CLI' ) ) {
 	return;
 }
 
