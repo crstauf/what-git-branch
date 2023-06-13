@@ -316,7 +316,7 @@ class CSSLLC_What_Git_Branch {
 			WP_CLI::error( 'Could not identify head reference.' );
 		}
 
-		if ( empty( $this->git_dir ) ) && empty( $this->external_file ) ) {
+		if ( empty( $this->git_dir ) && empty( $this->external_file ) ) {
 			WP_CLI::error( 'Path to git directory or external file not found.' );
 		}
 
