@@ -105,6 +105,10 @@ class Plugin {
 			return;
 		}
 
+		if ( apply_filters( 'what-git-branch/set_root_repo/disable', false ) ) {
+			return;
+		}
+
 		$this->set_repos();
 
 		$pre = ( string ) apply_filters( 'what-git-branch/set_root_repo/pre', '' );
