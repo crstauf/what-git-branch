@@ -21,6 +21,10 @@ class Repository {
 		return $this->$key;
 	}
 
+	public function key() {
+		return wp_hash( $this->path );
+	}
+
 	public function set_head_ref() : void {
 		$this->set_head_ref_from_external();
 
