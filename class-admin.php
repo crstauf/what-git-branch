@@ -182,23 +182,35 @@ class Admin {
 			background-size: auto 80%;
 		}
 
-		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root th {
-			font-weight: 700;
-		}
-
 		#dashboard-widgets-wrap #what-git-branch .inside :is( th, td ) {
 			padding: 5px 10px;
 			font-weight: normal;
 			text-align: left;
 		}
 
-		#dashboard-widgets-wrap #what-git-branch .inside tr:nth-child( even ) :is( th, td ) {
+		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root :is( th, td ) {
+			color: #FFF;
+		}
+
+		#dashboard-widgets-wrap #what-git-branch .inside tr:nth-child( even ):not( .is-root ) :is( th, td ) {
 			background-color: #eee;
 		}
 
-		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root :is( th, td ) {
-			background-color: #de5c3f;
-			color: #FFF;
+		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root {
+			position: relative;
+			z-index: 1;
+		}
+
+		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root th::before {
+			content: '';
+			position: absolute;
+			left: -13px;
+			top: 0;
+			z-index: -1;
+			display: block;
+			width: calc( 100% + 13px + 13px );
+			height: 100%;
+			background-color: #f14e32;
 		}
 
 		#dashboard-widgets-wrap #what-git-branch .inside a {
@@ -208,6 +220,10 @@ class Admin {
 
 		#dashboard-widgets-wrap #what-git-branch .inside a:not( :hover ) {
 			color: #999;
+		}
+
+		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root a {
+			color: #FFF;
 		}
 
 		#dashboard-widgets-wrap #what-git-branch .inside a .dashicons {
