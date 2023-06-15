@@ -132,8 +132,8 @@ class Repository {
 	 * @return bool
 	 */
 	public function is_branch() : bool {
-		if ( ! empty( $this->external_file ) ) {
-			return true;
+		if ( empty( $this->head_ref ) ) {
+			$this->set_head_ref();
 		}
 
 		return false !== stripos( $this->head_ref, self::HEAD_PREFIX );

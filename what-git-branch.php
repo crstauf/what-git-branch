@@ -92,24 +92,26 @@ class Plugin {
 		$ext_dirs = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR . '**/' . Repository::EXTERNAL_FILE ) );
 
 		$additional_paths = apply_filters( 'what-git-branch/set_repos/$additional_paths', array(
-			trailingslashit( ABSPATH ) . '.git/',
-			trailingslashit( ABSPATH ) . Repository::EXTERNAL_FILE,
-			trailingslashit( WP_CONTENT_DIR ) . '.git/',
-			trailingslashit( WP_CONTENT_DIR ) . Repository::EXTERNAL_FILE,
+			trailingslashit( ABSPATH ),
+			trailingslashit( WP_CONTENT_DIR ),
 		) );
 
 		foreach ( $additional_paths as $path ) {
-			if ( ! file_exists( $path ) ) {
+			if (
+				   ! file_exists( $path . '.git/' )
+				&& ! file_exists( $path . Repository::EXTERNAL_FILE )
+			) {
 				continue;
 			}
 
 			$dirs[] = $path;
 		}
 
-		$dirs = array_merge( $dirs, $git_dirs, $ext_dirs );
-		$dirs = array_unique( $dirs );
+		$git_dirs = array_map( 'dirname', $git_dirs );
+		$ext_dirs = array_map( 'dirname', $ext_dirs );
 
-		$repos = array_map( 'dirname', $dirs );
+		$repos = array_merge( $dirs, $git_dirs, $ext_dirs );
+		$repos = array_unique( $repos );
 		$repos = array_map( 'trailingslashit', $repos );
 		$repos = array_map( static function ( $repo_path ) {
 			return new Repository( $repo_path );
