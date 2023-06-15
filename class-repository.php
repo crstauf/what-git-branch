@@ -26,6 +26,9 @@ class Repository {
 	}
 
 	public function set_head_ref() : void {
+		$this->head_ref = null;
+		$this->branch   = null;
+
 		$this->set_head_ref_from_external();
 
 		if ( ! empty( $this->head_ref ) ) {

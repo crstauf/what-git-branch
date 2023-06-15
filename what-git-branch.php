@@ -44,6 +44,27 @@ class Plugin {
 		$instance->hooks();
 	}
 
+	public static function init_cli() : void {
+		static $init = false;
+
+		if ( $init ) {
+			return;
+		}
+
+		$init     = true;
+		$instance = new self;
+
+		require_once 'class-repository.php';
+		require_once 'class-wpcli.php';
+
+		$instance->set_repos();
+		$instance->set_root_repo();
+
+		$cli = new WPCLI( $instance->repos, $instance->root_repo );
+
+		\WP_CLI::add_command( 'whatgitbranch', $cli );
+	}
+
 	protected function __construct() {}
 
 	protected function recursive_glob( $pattern ) : array {
@@ -574,3 +595,9 @@ add_action( 'init', static function() : void {
 
 	Plugin::init();
 } );
+
+if ( ! defined( 'WP_CLI' ) || ! constant( 'WP_CLI' ) || ! file_exists( __DIR__ . '/class-wpcli.php' ) ) {
+	return;
+}
+
+Plugin::init_cli();
