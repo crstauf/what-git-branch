@@ -19,9 +19,9 @@ The second and final approach reads the `.git/HEAD` file, and parses it for the 
 
 ## Searchable Paths
 
-The plugin by default checks `ABSPATH` and `WP_CONTENT_DIR` directories for a `.git` directory, as well as the `.what-git-branch` file.
+The plugin by default checks `ABSPATH` and `WP_CONTENT_DIR` directories for a `.git` directory, or a `.what-git-branch` file.
 
-More paths can be added via the `what_git_branch/paths` filter.
+More paths can be added via the `what-git-branch/set_repos/$additional_paths` filter.
 
 ## Remote Environments
 
