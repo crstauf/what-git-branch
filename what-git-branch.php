@@ -2,7 +2,7 @@
 /*
 Plugin Name: What Git Branch?
 Plugin URI: https://github.com/crstauf/what-git-branch
-Version: 2.0.0
+Version: 2.1.0
 Author: Caleb Stauffer
 Author URI: https://develop.calebstauffer.com
 */
@@ -18,9 +18,14 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 class Plugin {
 
 	public const HEARTBEAT_KEY = 'what_git_branch';
+	public const TRANSIENT_KEY = 'what-git-branch-repos';
 
 	protected $repos = array();
 	protected $root_repo;
+
+	public function __get( $key ) {
+		return $this->$key;
+	}
 
 	/**
 	 * Initialize.
@@ -60,7 +65,7 @@ class Plugin {
 		$instance->set_repos();
 		$instance->set_root_repo();
 
-		$cli = new WPCLI( $instance->repos, $instance->root_repo );
+		$cli = new WPCLI( $instance );
 
 		\WP_CLI::add_command( 'whatgitbranch', $cli );
 	}
@@ -77,19 +82,46 @@ class Plugin {
 		return $files;
 	}
 
+	protected function scan_for_dirs() : bool {
+		return apply_filters( 'what-git-branch/scan_for_dirs()', true );
+	}
+
 	/**
 	 * @uses $this->recursive_glob()
 	 *
 	 * @return void
 	 */
-	protected function set_repos() : void {
+	public function set_repos() : void {error_log( __METHOD__ );
 		if ( ! empty( $this->repos ) ) {
 			return;
 		}
+error_log( '94' );
+		$this->set_repos_from_filter();
+
+		if ( ! empty( $this->repos ) ) {
+			return;
+		}
+error_log( '100' );
+		$this->set_repos_from_cache();
+
+		if ( ! empty( $this->repos ) ) {
+			return;
+		}
+error_log( '106' );
+		if ( ! $this->scan_for_dirs() ) {
+			return;
+		}
+error_log( '111' );
+		do_action( 'qm/start', 'what-git-branch/set_repos()' );
 
 		$dirs     = array();
 		$git_dirs = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR ) . '**/.git/' );
-		$ext_dirs = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR . '**/' . Repository::EXTERNAL_FILE ) );
+
+		do_action( 'qm/lap', 'what-git-branch/set_repos()', '$git_dirs' );
+
+		$ext_dirs = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR ) . '**/' . Repository::EXTERNAL_FILE );
+
+		do_action( 'qm/lap', 'what-git-branch/set_repos()', '$ext_dirs' );
 
 		$additional_paths = apply_filters( 'what-git-branch/set_repos/$additional_paths', array(
 			trailingslashit( ABSPATH ),
@@ -107,6 +139,8 @@ class Plugin {
 			$dirs[] = $path;
 		}
 
+		do_action( 'qm/lap', 'what-git-branch/set_repos()', '$additional_paths' );
+
 		$git_dirs = array_map( 'dirname', $git_dirs );
 		$ext_dirs = array_map( 'dirname', $ext_dirs );
 
@@ -118,6 +152,39 @@ class Plugin {
 		}, $repos );
 
 		$this->repos = $repos;
+
+		set_transient( self::TRANSIENT_KEY, $this->repos, DAY_IN_SECONDS );
+
+		do_action( 'qm/lap', 'what-git-branch/set_repos()', '$this->repos' );
+		do_action( 'qm/stop', 'what-git-branch/set_repos()' );
+	}
+
+	protected function set_repos_from_filter() {
+		$pre = apply_filters( 'what-git-branch/set_repos()/$pre', null );
+
+		if ( empty( $pre ) || ! is_array( $pre ) ) {
+			return;
+		}
+
+		$pre = array_filter( 'file_exists', $pre );
+		$pre = array_filter( 'is_dir', $pre );
+		$pre = array_unique( $pre );
+		$pre = array_map( 'trailingslashit', $pre );
+		$pre = array_map( static function ( $repo_path ) {
+			return new Repository( $repo_path );
+		}, $pre );
+
+		$this->repos = $pre;
+	}
+
+	protected function set_repos_from_cache() {
+		$cache = get_transient( self::TRANSIENT_KEY );
+
+		if ( empty( $cache ) ) {
+			return;
+		}
+
+		$this->repos = $cache;
 	}
 
 	/**
@@ -136,7 +203,18 @@ class Plugin {
 
 		$pre = ( string ) apply_filters( 'what-git-branch/set_root_repo/pre', '' );
 
-		if ( ! empty( $pre ) ) {
+		if ( ! empty( $pre ) && file_exists( $pre ) && is_dir( $pre ) ) {
+			if ( ! $this->scan_for_dirs() ) {
+				$this->root_repo = new Repository( $pre );
+				$this->root_repo->set_as_root();
+
+				if ( empty( $this->repos ) ) {
+					$this->repos[] = &$this->root_repo;
+				}
+
+				return;
+			}
+
 			foreach ( $this->repos as $repo ) {
 				if ( $pre !== $repo->path ) {
 					continue;
@@ -149,6 +227,10 @@ class Plugin {
 			}
 
 			trigger_error( sprintf( 'Manually setting root repository failed: %s', $pre ), E_USER_WARNING );
+			return;
+		}
+
+		if ( ! $this->scan_for_dirs() ) {
 			return;
 		}
 
@@ -215,7 +297,7 @@ class Plugin {
 	 */
 	public function callback__dashboard_widget() : void {
 		if ( empty( $this->repos ) ) {
-			echo '<p>No repositories founds.</p>';
+			echo '<p>No repositories found.</p>';
 			return;
 		}
 
@@ -240,7 +322,7 @@ class Plugin {
 
 			$name = apply_filters( 'what-git-branch/callback__dashboard_widget/foreach/name', basename( $repo->path ), $repo );
 
-			if ( $repo->is_root ) {
+			if ( $repo->is_root || ( ! empty( $this->root_repo ) && $repo->path === $this->root_repo->path ) ) {
 				$attr__class = ' class="is-root"';
 			}
 
@@ -351,7 +433,7 @@ class Plugin {
 			color: #FFF;
 		}
 
-		#dashboard-widgets-wrap #what-git-branch .inside tr:nth-child( even ):not( .is-root ) :is( th, td ) {
+		#dashboard-widgets-wrap #what-git-branch .inside tr:nth-child( odd ):not( .is-root ) :is( th, td ) {
 			background-color: #eee;
 		}
 
