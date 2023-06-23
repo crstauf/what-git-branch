@@ -77,6 +77,10 @@ class Plugin {
 		return $files;
 	}
 
+	protected function do_scan() : bool {
+		return apply_filters( 'what-git-branch/do-scan', true );
+	}
+
 	/**
 	 * @uses $this->recursive_glob()
 	 *
@@ -87,9 +91,13 @@ class Plugin {
 			return;
 		}
 
+		if ( ! $this->do_scan() ) {
+			return;
+		}
+
 		$dirs     = array();
 		$git_dirs = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR ) . '**/.git/' );
-		$ext_dirs = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR . '**/' . Repository::EXTERNAL_FILE ) );
+		$ext_dirs = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR ) . '**/' . Repository::EXTERNAL_FILE );
 
 		$additional_paths = apply_filters( 'what-git-branch/set_repos/$additional_paths', array(
 			trailingslashit( ABSPATH ),
@@ -136,7 +144,14 @@ class Plugin {
 
 		$pre = ( string ) apply_filters( 'what-git-branch/set_root_repo/pre', '' );
 
-		if ( ! empty( $pre ) ) {
+		if ( ! empty( $pre ) && file_exists( $pre ) && is_dir( $pre ) ) {
+			$this->root_repo = new Repository( $pre );
+
+			if ( ! $this->do_scan() ) {
+				$this->repos[] = &$this->root_repo;
+				return;
+			}
+
 			foreach ( $this->repos as $repo ) {
 				if ( $pre !== $repo->path ) {
 					continue;
@@ -149,6 +164,10 @@ class Plugin {
 			}
 
 			trigger_error( sprintf( 'Manually setting root repository failed: %s', $pre ), E_USER_WARNING );
+			return;
+		}
+
+		if ( ! $this->do_scan() ) {
 			return;
 		}
 
@@ -215,7 +234,7 @@ class Plugin {
 	 */
 	public function callback__dashboard_widget() : void {
 		if ( empty( $this->repos ) ) {
-			echo '<p>No repositories founds.</p>';
+			echo '<p>No repositories found.</p>';
 			return;
 		}
 
@@ -264,6 +283,7 @@ class Plugin {
 		}
 
 		echo '</table>';
+do_action( 'qm/stop', 'what-git-branch-dashboard' );
 	}
 
 	/**
@@ -507,7 +527,7 @@ class Plugin {
 		if ( 'wp_dashboard_setup' !== current_action() ) {
 			return;
 		}
-
+do_action( 'qm/start', 'what-git-branch-dashboard' );
 		$this->register_dashboard_widget();
 	}
 
