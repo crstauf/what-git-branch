@@ -2,7 +2,7 @@
 /*
 Plugin Name: What Git Branch?
 Plugin URI: https://github.com/crstauf/what-git-branch
-Version: 2.1.0
+Version: 2.1.1
 Author: Caleb Stauffer
 Author URI: https://develop.calebstauffer.com
 */
@@ -91,27 +91,27 @@ class Plugin {
 	 *
 	 * @return void
 	 */
-	public function set_repos() : void {error_log( __METHOD__ );
+	public function set_repos() : void {
 		if ( ! empty( $this->repos ) ) {
 			return;
 		}
-error_log( '94' );
+
 		$this->set_repos_from_filter();
 
 		if ( ! empty( $this->repos ) ) {
 			return;
 		}
-error_log( '100' );
+
 		$this->set_repos_from_cache();
 
 		if ( ! empty( $this->repos ) ) {
 			return;
 		}
-error_log( '106' );
+
 		if ( ! $this->scan_for_dirs() ) {
 			return;
 		}
-error_log( '111' );
+
 		do_action( 'qm/start', 'what-git-branch/set_repos()' );
 
 		$dirs     = array();
