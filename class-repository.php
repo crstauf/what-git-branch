@@ -11,7 +11,7 @@ class Repository {
 	protected $external_file;
 	protected $head_ref;
 	protected $branch;
-	protected $is_root = false;
+	protected $is_primary = false;
 
 	public function __construct( $path ) {
 		$this->path = $path;
@@ -25,6 +25,10 @@ class Repository {
 		return wp_hash( $this->path );
 	}
 
+	public function set_primary() {
+		$this->is_primary = true;
+	}
+
 	public function set_head_ref() : void {
 		$this->head_ref = null;
 		$this->branch   = null;
@@ -36,10 +40,6 @@ class Repository {
 		}
 
 		$this->set_head_ref_from_git();
-	}
-
-	public function set_as_root() : void {
-		$this->is_root = true;
 	}
 
 	protected function set_head_ref_from_external() : void {
@@ -97,11 +97,15 @@ class Repository {
 			$this->set_head_ref();
 		}
 
-		if ( $this->is_branch() ) {
-			return apply_filters( 'what-git-branch/get_head_ref/branch', $this->get_branch() );
+		$branch = $this->get_branch();
+
+		if ( ! empty( $branch ) ) {
+			return $branch;
 		}
 
-		return apply_filters( 'what-git-branch/get_head_ref/commit', substr( $this->head_ref, 0, 7 ), $this->head_ref );
+		$head_ref = substr( $this->head_ref, 0, 7 );
+
+		return apply_filters( 'what-git-branch/get_head_ref()/commit', $head_ref, $this->head_ref );
 	}
 
 	/**
@@ -119,7 +123,10 @@ class Repository {
 			return $this->branch;
 		}
 
-		$this->branch = trim( str_replace( self::HEAD_PREFIX, '', $this->head_ref ) );
+		$branch = trim( str_replace( self::HEAD_PREFIX, '', $this->head_ref ) );
+		$branch = apply_filters( 'what-git-branch/get_branch()/$branch', $branch, $this );
+
+		$this->branch = $branch;
 
 		return $this->branch;
 	}
@@ -134,6 +141,10 @@ class Repository {
 	public function is_branch() : bool {
 		if ( empty( $this->head_ref ) ) {
 			$this->set_head_ref();
+		}
+
+		if ( ! empty( $this->external_file ) ) {
+			return true;
 		}
 
 		return false !== stripos( $this->head_ref, self::HEAD_PREFIX );
@@ -158,13 +169,13 @@ class Repository {
 	public function get_github_url() : string {
 		$github_repo = '';
 
-		if ( $this->is_root && defined( 'WHATGITBRANCH_ROOT_GITHUB_REPO' ) ) {
-			$github_repo = constant( 'WHATGITBRANCH_ROOT_GITHUB_REPO' );
+		if ( $this->is_primary && defined( 'WHATGITBRANCH_PRIMARY_GITHUB_REPO' ) ) {
+			$github_repo = constant( 'WHATGITBRANCH_PRIMARY_GITHUB_REPO' );
 		}
 
-		$github_repo = apply_filters( 'what-git-branch/get_github_url/$github_repo', $github_repo, $this->path );
+		$github_repo = apply_filters( 'what-git-branch/get_github_url()/$github_repo', $github_repo, $this->path );
 
-		if ( empty( $github_repo ) ) {
+		if ( empty( $github_repo ) || ! is_string( $github_repo ) ) {
 			return '';
 		}
 
