@@ -14,23 +14,59 @@ class Repository {
 	protected $branch;
 	protected $is_primary = false;
 
-	public function __construct( $path ) {
+	/**
+	 * Construct.
+	 *
+	 * @param string $path
+	 */
+	public function __construct( string $path ) {
 		$this->path = $path;
+
+		/**
+		 * Set repository name.
+		 *
+		 * @param string $name
+		 */
 		$this->name = apply_filters( 'what-git-branch/repository/name', basename( $path ) );
 	}
 
-	public function __get( $key ) {
+	/**
+	 * Getter.
+	 *
+	 * @param string $key
+	 *
+	 * @return mixed
+	 */
+	public function __get( string $key ) {
 		return $this->$key;
 	}
 
-	public function key() {
+	/**
+	 * Get key to identify repository.
+	 *
+	 * @return string
+	 */
+	public function key() : string {
 		return wp_hash( $this->path );
 	}
 
-	public function set_primary() {
+	/**
+	 * Set this repo as the primary.
+	 *
+	 * @return void
+	 */
+	public function set_primary() : void {
 		$this->is_primary = true;
 	}
 
+	/**
+	 * Set head reference from external file or git.
+	 *
+	 * @uses $this->set_head_ref_from_external()
+	 * @uses $this->set_head_ref_from_git()
+	 *
+	 * @return void
+	 */
 	public function set_head_ref() : void {
 		$this->head_ref = null;
 		$this->branch   = null;
@@ -44,6 +80,11 @@ class Repository {
 		$this->set_head_ref_from_git();
 	}
 
+	/**
+	 * Set head reference from external file.
+	 *
+	 * @return void
+	 */
 	protected function set_head_ref_from_external() : void {
 		$path = trailingslashit( $this->path ) . self::EXTERNAL_FILE;
 
@@ -63,6 +104,11 @@ class Repository {
 		$this->head_ref = $external_file;
 	}
 
+	/**
+	 * Set head reference from git.
+	 *
+	 * @return void
+	 */
 	protected function set_head_ref_from_git() : void {
 		$path = trailingslashit( $this->path ) . '.git/';
 
@@ -90,8 +136,8 @@ class Repository {
 	 * Get head reference.
 	 *
 	 * @uses $this->set_head_ref()
-	 * @uses $this->is_branch()
 	 * @uses $this->get_branch()
+	 *
 	 * @return string
 	 */
 	public function get_head_ref() : string {
@@ -107,6 +153,12 @@ class Repository {
 
 		$head_ref = substr( $this->head_ref, 0, 7 );
 
+		/**
+		 * Change head reference for repository.
+		 *
+		 * @param string $head_ref
+		 * @param string $raw_head_ref
+		 */
 		return apply_filters( 'what-git-branch/get_head_ref()/commit', $head_ref, $this->head_ref );
 	}
 
@@ -114,6 +166,7 @@ class Repository {
 	 * Get branch name.
 	 *
 	 * @uses $this->is_branch()
+	 *
 	 * @return string
 	 */
 	protected function get_branch() : string {
@@ -126,6 +179,13 @@ class Repository {
 		}
 
 		$branch = trim( str_replace( self::HEAD_PREFIX, '', $this->head_ref ) );
+
+		/**
+		 * Set branch name.
+		 *
+		 * @param string $branch
+		 * @param self $this
+		 */
 		$branch = apply_filters( 'what-git-branch/get_branch()/$branch', $branch, $this );
 
 		$this->branch = $branch;
@@ -137,6 +197,8 @@ class Repository {
 	 * Check if head reference is a branch.
 	 *
 	 * If external file in use, always return true.
+	 *
+	 * @uses $this->set_head_ref()
 	 *
 	 * @return bool
 	 */
@@ -156,6 +218,7 @@ class Repository {
 	 * Check if head reference is a commit.
 	 *
 	 * @uses $this->is_branch()
+	 *
 	 * @return bool
 	 */
 	public function is_commit() : bool {
@@ -166,6 +229,7 @@ class Repository {
 	 * Get URL to head reference on GitHub.
 	 *
 	 * @uses $this->get_head_ref()
+	 *
 	 * @return string
 	 */
 	public function get_github_url() : string {
@@ -175,6 +239,12 @@ class Repository {
 			$github_repo = constant( 'WHATGITBRANCH_PRIMARY_GITHUB_REPO' );
 		}
 
+		/**
+		 * Set GitHub URL for repository.
+		 *
+		 * @param string $github_repo
+		 * @param string $directory_path
+		 */
 		$github_repo = apply_filters( 'what-git-branch/get_github_url()/$github_repo', $github_repo, $this->path );
 
 		if ( empty( $github_repo ) || ! is_string( $github_repo ) ) {

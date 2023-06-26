@@ -8,14 +8,27 @@ class WPCLI {
 
 	protected $plugin;
 
+	/**
+	 * Construct.
+	 *
+	 * @param \What_Git_Branch\Plugin $plugin
+	 */
 	public function __construct( $plugin ) {
 		$this->plugin = $plugin;
 	}
 
 	/**
 	 * List all repositories.
+	 *
+	 * @param array<int, string> $args
+	 * @param array<string, string> $assoc
+	 *
+	 * @uses \What_Git_Branch\Plugin::set_repos()
+	 * @uses \What_Git_Branch\Repository::get_head_ref()
+	 *
+	 * @return void
 	 */
-	public function list( array $args, array $assoc = array() ) {
+	public function list( array $args, array $assoc = array() ) : void {
 		$this->plugin->set_repos();
 
 		$default_fields = array( 'name', 'ref', 'path' );
@@ -45,7 +58,14 @@ class WPCLI {
 		WP_CLI\Utils\format_items( $format, $rows, $fields );
 	}
 
-	public function directories( array $args ) {
+	/**
+	 * Command: directories
+	 *
+	 * @param array<int, string>
+	 *
+	 * @return void
+	 */
+	public function directories( array $args ) : void {
 		$this->directories_scan( $args );
 		$this->directories_clear_cache( $args );
 
@@ -54,8 +74,12 @@ class WPCLI {
 
 	/**
 	 * Scan filesystem for directories.
+	 *
+	 * @param array<int, string> $args
+	 *
+	 * @return void
 	 */
-	protected function directories_scan( $args ) {
+	protected function directories_scan( $args ) : void {
 		if ( 'scan' !== $args[0] ) {
 			return;
 		}
@@ -77,7 +101,16 @@ class WPCLI {
 		exit;
 	}
 
-	protected function directories_clear_cache( $args ) {
+	/**
+	 * Clear cache of directories.
+	 *
+	 * @param array<int, string> $args
+	 *
+	 * @uses \What_Git_Branch\Plugin::cache_store()
+	 *
+	 * @return void
+	 */
+	protected function directories_clear_cache( $args ) : void {
 		if ( 'clear-cache' !== $args[0] ) {
 			return;
 		}
@@ -97,7 +130,20 @@ class WPCLI {
 		exit;
 	}
 
-	public function primary( array $args ) {
+	/**
+	 * Command: primary
+	 *
+	 * @param array<int, string> $args
+	 *
+	 * @uses \What_Git_Branch\Plugin::primary()
+	 * @uses \What_Git_Branch\Repository::set_head_ref()
+	 * @uses $this->primary_identify()
+	 * @uses $this->primary_set()
+	 * @uses $this->primary_reset()
+	 *
+	 * @return void
+	 */
+	public function primary( array $args ) : void {
 		if ( is_null( $this->plugin->primary() ) ) {
 			WP_CLI::warning( 'No primary repository.' );
 			exit;
@@ -112,7 +158,17 @@ class WPCLI {
 		WP_CLI::error( 'Unrecognized subcommand' );
 	}
 
-	protected function primary_identify( array $args ) {
+	/**
+	 * Command: primary identify
+	 *
+	 * @param array<int, string> $args
+	 *
+	 * @uses \What_Git_Branch\Plugin::primary()
+	 * @uses \What_Git_Branch\Repository::get_head_ref()
+	 *
+	 * @return void
+	 */
+	protected function primary_identify( array $args ) : void {
 		if ( 'identify' !== $args[0] ) {
 			return;
 		}
@@ -130,7 +186,16 @@ class WPCLI {
 		WP_CLI::error( 'Unrecognized subcommand' );
 	}
 
-	protected function primary_set( array $args ) {
+	/**
+	 * Command: primary set
+	 *
+	 * @param array<int, string> $args
+	 *
+	 * @uses \What_Git_Branch\Plugin::primary()
+	 *
+	 * @return void
+	 */
+	protected function primary_set( array $args ) : void {
 		if ( 'set' !== $args[0] ) {
 			return;
 		}
@@ -151,7 +216,16 @@ class WPCLI {
 		exit;
 	}
 
-	protected function primary_reset( array $args ) {
+	/**
+	 * Command: primary reset
+	 *
+	 * @param array<int, string> $args
+	 *
+	 * @uses \What_Git_Branch\Plugin::primary()
+	 *
+	 * @return void
+	 */
+	protected function primary_reset( array $args ) : void {
 		if ( 'reset' !== $args[0] ) {
 			return;
 		}
