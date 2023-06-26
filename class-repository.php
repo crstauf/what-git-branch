@@ -7,6 +7,7 @@ class Repository {
 	public const EXTERNAL_FILE = '.what-git-branch';
 	public const HEAD_PREFIX   = 'ref: refs/heads/';
 
+	protected $name;
 	protected $path;
 	protected $external_file;
 	protected $head_ref;
@@ -15,6 +16,7 @@ class Repository {
 
 	public function __construct( $path ) {
 		$this->path = $path;
+		$this->name = apply_filters( 'what-git-branch/repository/name', basename( $path ) );
 	}
 
 	public function __get( $key ) {

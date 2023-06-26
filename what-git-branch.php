@@ -78,7 +78,7 @@ class Plugin {
 		return $files;
 	}
 
-	protected function primary() {
+	public function primary() {
 		if ( ! empty( $this->primary ) ) {
 			return $this->primary;
 		}
@@ -131,7 +131,7 @@ class Plugin {
 		}
 	}
 
-	protected function get_dirs() : array {
+	public function get_dirs() : array {
 		$dirs = $this->get_dirs_from_filter();
 
 		if ( empty( $dirs ) ) {
@@ -248,7 +248,14 @@ class Plugin {
 
 		switch ( $when ) {
 
-			case 'often':
+			case 'off':
+			case 'coded':
+			case 'never':
+			case 'filtered':
+				$cache = 'never';
+				break;
+
+			case 'asap':
 			case 'always':
 			case 'http-request':
 				$cache = 'http-request';
@@ -267,7 +274,8 @@ class Plugin {
 				break;
 
 			default:
-			case 'async';
+			case 'ajax':
+			case 'async':
 			case 'heartbeat':
 				$cache = 'heartbeat';
 				break;
@@ -284,15 +292,29 @@ class Plugin {
 	 *
 	 * @return bool
 	 */
-	protected function can_scan() : bool {
+	public function can_scan() : bool {
 		static $cache = null;
 
 		if ( ! is_null( $cache ) ) {
 			return $cache;
 		}
 
+		if ( has_filter( 'what-git-branch/get_dirs_from_filter()/$dirs' ) ) {
+			$cache = false;
+			return $cache;
+		}
+
 		$when = $this->when_can_scan();
 		$cli  = defined( 'WP_CLI' ) && constant( 'WP_CLI' );
+
+		if ( 'never' === $when ) {
+			$cache = false;
+			return $cache;
+		}
+
+		if ( $cli ) {
+			\WP_CLI::debug( sprintf( 'Scanning is permitted when (key): %s', $when ) );
+		}
 
 		// Scan once per HTTP request.
 		if ( 'http-request' === $when ) {
@@ -312,7 +334,7 @@ class Plugin {
 			return $cache;
 		}
 
-		// Not possible, but let's be clear.
+		// Not possible at this point, but let's be clear.
 		if ( 'heartbeat' !== $when ) {
 			$cache = false;
 			return $cache;
@@ -334,7 +356,7 @@ class Plugin {
 	 *
 	 * @return string
 	 */
-	protected function cache_store() : string {
+	public function cache_store() : string {
 		static $store = null;
 
 		if ( ! is_null( $store ) ) {
@@ -343,7 +365,7 @@ class Plugin {
 
 		$store = 'transient';
 
-		if ( in_array( $this->when_can_scan(), array( 'cli', 'heartbeat', 'manually' ) ) ) {
+		if ( in_array( $this->when_can_scan(), array( 'cli', 'heartbeat', 'manually', 'never' ) ) ) {
 			$store = 'option';
 		}
 
@@ -422,8 +444,6 @@ class Plugin {
 			$github_link = '';
 			$github_url  = $repo->get_github_url();
 
-			$name = apply_filters( 'what-git-branch/dashboard/foreach/name', basename( $repo->path ), $repo );
-
 			if ( ! empty( $this->primary() ) && $repo->path === $this->primary()->path ) {
 				$attr__class = ' class="is-primary"';
 			}
@@ -440,7 +460,7 @@ class Plugin {
 				'<tr valign="top"%s><th scope="row" title="%s">%s</th><td><code data-wgb-key="%s">%s</code>%s</td>',
 				$attr__class,
 				esc_attr( $repo->path ),
-				esc_html( $name ),
+				esc_html( $repo->name ),
 				esc_attr( $repo->key() ),
 				esc_html( $repo->get_head_ref() ),
 				$github_link
