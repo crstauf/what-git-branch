@@ -2,7 +2,7 @@
 /*
 Plugin Name: What Git Branch?
 Plugin URI: https://github.com/crstauf/what-git-branch
-Version: 2.1.1
+Version: 3.0.0
 Author: Caleb Stauffer
 Author URI: https://develop.calebstauffer.com
 */
@@ -17,13 +17,20 @@ if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 
 class Plugin {
 
+	public const CACHE_KEY     = 'what-git-branch-dirs';
 	public const HEARTBEAT_KEY = 'what_git_branch';
-	public const TRANSIENT_KEY = 'what-git-branch-repos';
 
-	protected $repos = array();
-	protected $root_repo;
+	protected $repos   = array();
+	protected $primary = null;
 
-	public function __get( $key ) {
+	/**
+	 * Getter.
+	 *
+	 * @param string $key
+	 *
+	 * @return mixed
+	 */
+	public function __get( string $key ) {
 		return $this->$key;
 	}
 
@@ -45,10 +52,14 @@ class Plugin {
 		require_once 'class-repository.php';
 
 		$instance->set_repos();
-		$instance->set_root_repo();
 		$instance->hooks();
 	}
 
+	/**
+	 * Initialize for CLI.
+	 *
+	 * @return void
+	 */
 	public static function init_cli() : void {
 		static $init = false;
 
@@ -62,16 +73,21 @@ class Plugin {
 		require_once 'class-repository.php';
 		require_once 'class-wpcli.php';
 
-		$instance->set_repos();
-		$instance->set_root_repo();
-
 		$cli = new WPCLI( $instance );
 
 		\WP_CLI::add_command( 'whatgitbranch', $cli );
 	}
 
+	/**
+	 * Construct.
+	 */
 	protected function __construct() {}
 
+	/**
+	 * Glob recursively.
+	 *
+	 * @uses $this->recursive_glob()
+	 */
 	protected function recursive_glob( $pattern ) : array {
 		$files = glob( $pattern );
 
@@ -82,12 +98,52 @@ class Plugin {
 		return $files;
 	}
 
-	protected function scan_for_dirs() : bool {
-		return apply_filters( 'what-git-branch/scan_for_dirs()', true );
+	/**
+	 * Get primary repository.
+	 *
+	 * @return \What_Git_Branch\Repository
+	 */
+	public function primary() : Repository {
+		if ( ! empty( $this->primary ) ) {
+			return $this->primary;
+		}
+
+		/**
+		 * Set the directory of the primary repository.
+		 *
+		 * @param string $directory_path
+		 */
+		$dir = apply_filters( 'what-git-branch/primary()/$dir', '' );
+
+		if ( empty( $dir ) || ! is_string( $dir ) ) {
+			return null;
+		}
+
+		if ( ! file_exists( $dir ) || ! is_dir( $dir ) ) {
+			return null;
+		}
+
+		$dir = trailingslashit( $dir );
+
+		if (
+			   ! file_exists( $dir . '.git/' )
+			&& ! file_exists( $dir . Repository::EXTERNAL_FILE )
+		) {
+			return null;
+		}
+
+		$this->primary = new Repository( $dir );
+
+		return $this->primary;
 	}
 
 	/**
-	 * @uses $this->recursive_glob()
+	 * Set repositories from directories.
+	 *
+	 * @uses $this->get_dirs()
+	 * @uses \What_Git_Branch\Repository::__construct()
+	 * @uses $this->primary()
+	 * @uses \What_Git_Branch\Repository::set_primary()
 	 *
 	 * @return void
 	 */
@@ -96,39 +152,146 @@ class Plugin {
 			return;
 		}
 
-		$this->set_repos_from_filter();
+		$dirs = $this->get_dirs();
 
-		if ( ! empty( $this->repos ) ) {
+		if ( empty( $dirs ) ) {
+			trigger_error( 'No directories set/found for git repositories.', E_USER_NOTICE );
 			return;
 		}
 
-		$this->set_repos_from_cache();
+		foreach ( $dirs as $dir ) {
+			$this->repos[ $dir ] = new Repository( $dir );
 
-		if ( ! empty( $this->repos ) ) {
-			return;
+			if ( empty( $this->primary() ) || $this->primary()->path !== $dir ) {
+				continue;
+			}
+
+			$this->repos[ $dir ]->set_primary();
+			$this->primary = &$this->repos[ $dir ];
+		}
+	}
+
+	/**
+	 * Get directories from filter, cache, or filesystem.
+	 *
+	 * @uses $this->get_dirs_from_filter()
+	 * @uses $this->get_dirs_from_cache()
+	 * @uses $this->get_dirs_from_scan()
+	 * @uses $this->primary()
+	 *
+	 * @return array<int, string>
+	 */
+	public function get_dirs() : array {
+		$dirs = $this->get_dirs_from_filter();
+
+		if ( empty( $dirs ) ) {
+			$dirs = $this->get_dirs_from_cache();
 		}
 
-		if ( ! $this->scan_for_dirs() ) {
-			return;
+		if ( empty( $dirs ) ) {
+			$dirs = $this->get_dirs_from_scan();
 		}
 
-		do_action( 'qm/start', 'what-git-branch/set_repos()' );
+		$primary = $this->primary();
 
-		$dirs     = array();
-		$git_dirs = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR ) . '**/.git/' );
+		if ( ! empty( $primary ) ) {
+			$dirs[] = $primary->path;
+		}
 
-		do_action( 'qm/lap', 'what-git-branch/set_repos()', '$git_dirs' );
+		$dirs = array_unique( $dirs );
+
+		if ( empty( $dirs ) ) {
+			return array();
+		}
+
+		return $dirs;
+	}
+
+	/**
+	 * Get directories from filter.
+	 *
+	 * @return array<int, string>
+	 */
+	protected function get_dirs_from_filter() : array {
+		/**
+		 * Set list of directories to scan.
+		 *
+		 * @param array<int, string> $directory_paths
+		 */
+		$dirs = apply_filters( 'what-git-branch/get_dirs_from_filter()/$dirs', array() );
+
+		$dirs = array_map( 'trailingslashit', $dirs );
+		$dirs = array_filter( $dirs, static function ( $dir ) {
+			if ( ! file_exists( $dir ) || ! is_dir( $dir ) ) {
+				return false;
+			}
+
+			return file_exists( $dir . '.git/' ) || file_exists( $dir . Repository::EXTERNAL_FILE );
+		} );
+
+		return $dirs;
+	}
+
+	/**
+	 * Get directories from cache.
+	 *
+	 * @uses $this->cache_store()
+	 *
+	 * @return array<int, string>
+	 */
+	protected function get_dirs_from_cache() : array {
+		if ( 'option' === $this->cache_store() ) {
+			return get_option( self::CACHE_KEY, array() );
+		}
+
+		$transient = get_transient( self::CACHE_KEY );
+
+		if ( empty( $transient ) || ! is_array( $transient ) ) {
+			return array();
+		}
+
+		return $transient;
+	}
+
+	/**
+	 * Get directories from filesystem.
+	 *
+	 * @uses $this->can_scan()
+	 * @uses $this->recursive_glob()
+	 * @uses $this->set_dirs_to_cache()
+	 *
+	 * @return array<int, string>
+	 */
+	protected function get_dirs_from_scan() : array {
+		if ( ! $this->can_scan() ) {
+			return array();
+		}
+
+		$profiling_key = 'what-git-branch/get_dirs_from_scan()';
+
+		do_action( 'qm/start', $profiling_key );
+
+		$addtl_dirs = array();
+		$ext_dirs   = array();
+		$git_dirs   = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR ) . '**/.git/' );
+
+		do_action( 'qm/lap', $profiling_key, '$git_dirs' );
 
 		$ext_dirs = $this->recursive_glob( trailingslashit( WP_CONTENT_DIR ) . '**/' . Repository::EXTERNAL_FILE );
 
-		do_action( 'qm/lap', 'what-git-branch/set_repos()', '$ext_dirs' );
+		do_action( 'qm/lap', $profiling_key, '$ext_dirs' );
 
-		$additional_paths = apply_filters( 'what-git-branch/set_repos/$additional_paths', array(
+		/**
+		 * Set additional directories to scan.
+		 *
+		 * @param array<int, string> $directory_paths
+		 */
+		$addtl_paths = apply_filters( 'what-git-branch/get_dirs_from_scan()/$addtl_paths', array(
 			trailingslashit( ABSPATH ),
 			trailingslashit( WP_CONTENT_DIR ),
 		) );
 
-		foreach ( $additional_paths as $path ) {
+		foreach ( $addtl_paths as $path ) {
 			if (
 				   ! file_exists( $path . '.git/' )
 				&& ! file_exists( $path . Repository::EXTERNAL_FILE )
@@ -136,140 +299,221 @@ class Plugin {
 				continue;
 			}
 
-			$dirs[] = $path;
+			$addtl_dirs[] = $path;
 		}
 
-		do_action( 'qm/lap', 'what-git-branch/set_repos()', '$additional_paths' );
+		do_action( 'qm/lap', $profiling_key, '$addtl_dirs' );
 
 		$git_dirs = array_map( 'dirname', $git_dirs );
 		$ext_dirs = array_map( 'dirname', $ext_dirs );
+		$dirs     = array_merge( $addtl_dirs, $git_dirs, $ext_dirs );
+		$dirs     = array_unique( $dirs );
+		$dirs     = array_map( 'trailingslashit', $dirs );
 
-		$repos = array_merge( $dirs, $git_dirs, $ext_dirs );
-		$repos = array_unique( $repos );
-		$repos = array_map( 'trailingslashit', $repos );
-		$repos = array_map( static function ( $repo_path ) {
-			return new Repository( $repo_path );
-		}, $repos );
+		do_action( 'qm/lap', $profiling_key, '$dirs' );
 
-		$this->repos = $repos;
+		$this->set_dirs_to_cache( $dirs );
 
-		set_transient( self::TRANSIENT_KEY, $this->repos, DAY_IN_SECONDS );
+		do_action( 'qm/stop', $profiling_key );
 
-		do_action( 'qm/lap', 'what-git-branch/set_repos()', '$this->repos' );
-		do_action( 'qm/stop', 'what-git-branch/set_repos()' );
-	}
-
-	protected function set_repos_from_filter() {
-		$pre = apply_filters( 'what-git-branch/set_repos()/$pre', null );
-
-		if ( empty( $pre ) || ! is_array( $pre ) ) {
-			return;
-		}
-
-		$pre = array_filter( 'file_exists', $pre );
-		$pre = array_filter( 'is_dir', $pre );
-		$pre = array_unique( $pre );
-		$pre = array_map( 'trailingslashit', $pre );
-		$pre = array_map( static function ( $repo_path ) {
-			return new Repository( $repo_path );
-		}, $pre );
-
-		$this->repos = $pre;
-	}
-
-	protected function set_repos_from_cache() {
-		$cache = get_transient( self::TRANSIENT_KEY );
-
-		if ( empty( $cache ) ) {
-			return;
-		}
-
-		$this->repos = $cache;
+		return $dirs;
 	}
 
 	/**
-	 * return void
+	 * Key to determine permitted context for directory scanning.
+	 *
+	 * @return string
 	 */
-	protected function set_root_repo() : void {
-		if ( ! is_null( $this->root_repo ) ) {
-			return;
+	protected function when_can_scan() : string {
+		static $cache = null;
+
+		if ( ! is_null( $cache ) ) {
+			return $cache;
 		}
 
-		if ( apply_filters( 'what-git-branch/set_root_repo/disable', false ) ) {
-			return;
+		/**
+		 * Set context to permit directory scanning.
+		 *
+		 * @param string $when Default: 'heartbeat'.
+		 */
+		$when = apply_filters( 'what-git-branch/when_can_scan()', 'heartbeat' );
+
+		switch ( $when ) {
+
+			case 'off':
+			case 'coded':
+			case 'never':
+			case 'filtered':
+				$cache = 'never';
+				break;
+
+			case 'asap':
+			case 'always':
+			case 'http-request':
+				$cache = 'http-request';
+				break;
+
+			case 'manual':
+			case 'manually':
+			case 'necessary':
+			case 'empty-cache':
+				$cache = 'manually';
+				break;
+
+			case 'cli':
+			case 'wpcli':
+				$cache = 'cli';
+				break;
+
+			default:
+			case 'ajax':
+			case 'async':
+			case 'heartbeat':
+				$cache = 'heartbeat';
+				break;
+
 		}
 
-		$this->set_repos();
-
-		$pre = ( string ) apply_filters( 'what-git-branch/set_root_repo/pre', '' );
-
-		if ( ! empty( $pre ) && file_exists( $pre ) && is_dir( $pre ) ) {
-			if ( ! $this->scan_for_dirs() ) {
-				$this->root_repo = new Repository( $pre );
-				$this->root_repo->set_as_root();
-
-				if ( empty( $this->repos ) ) {
-					$this->repos[] = &$this->root_repo;
-				}
-
-				return;
-			}
-
-			foreach ( $this->repos as $repo ) {
-				if ( $pre !== $repo->path ) {
-					continue;
-				}
-
-				$this->root_repo = &$repo;
-				$this->root_repo->set_as_root();
-
-				return;
-			}
-
-			trigger_error( sprintf( 'Manually setting root repository failed: %s', $pre ), E_USER_WARNING );
-			return;
-		}
-
-		if ( ! $this->scan_for_dirs() ) {
-			return;
-		}
-
-		$dirs = array();
-
-		foreach ( $this->repos as $repo ) {
-			$dirs[ $repo->path ] = count( explode( '/', $repo->path ) );
-		}
-
-		$min  = min( $dirs );
-		$dirs = array_filter( $dirs, static function ( $count ) use ( $min ) {
-			return $count <= $min;
-		} );
-
-		if ( 1 !== count( $dirs ) ) {
-			$this->root_repo = false;
-			return;
-		}
-
-		$dirs = array_keys( $dirs );
-		$root = array_pop( $dirs );
-
-		foreach ( $this->repos as $repo ) {
-			if ( $root !== $repo->path ) {
-				continue;
-			}
-
-			$this->root_repo = &$repo;
-			$this->root_repo->set_as_root();
-
-			break;
-		}
+		return $cache;
 	}
 
+	/**
+	 * Should directories be searched for git repositories.
+	 *
+	 * By default, scan is only performed in AJAX requests.
+	 *
+	 * @uses $this->when_can_scan()
+	 * @uses $this->get_dirs_from_cache()
+	 *
+	 * @return bool
+	 */
+	public function can_scan() : bool {
+		static $cache = null;
+
+		if ( ! is_null( $cache ) ) {
+			return $cache;
+		}
+
+		if ( has_filter( 'what-git-branch/get_dirs_from_filter()/$dirs' ) ) {
+			$cache = false;
+			return $cache;
+		}
+
+		$when = $this->when_can_scan();
+		$cli  = defined( 'WP_CLI' ) && constant( 'WP_CLI' );
+
+		if ( 'never' === $when ) {
+			$cache = false;
+			return $cache;
+		}
+
+		if ( $cli ) {
+			\WP_CLI::debug( sprintf( 'Scanning is permitted when (key): %s', $when ) );
+		}
+
+		// Scan once per HTTP request.
+		if ( 'http-request' === $when ) {
+			$cache = true;
+			return $cache;
+		}
+
+		// Scan only from CLI.
+		if ( 'cli' === $when ) {
+			$cache = $cli;
+			return $cache;
+		}
+
+		// Scan manually, or when cache is empty.
+		if ( 'manually' === $when ) {
+			$cache = $cli || empty( $this->get_dirs_from_cache() );
+			return $cache;
+		}
+
+		// Not possible at this point, but let's be clear.
+		if ( 'heartbeat' !== $when ) {
+			$cache = false;
+			return $cache;
+		}
+
+		// Scan when in AJAX/heartbeat or CLI.
+		$cache = wp_doing_ajax() || $cli;
+
+		return $cache;
+	}
+
+	/**
+	 * Get cache store location.
+	 *
+	 * @uses $this->when_can_scan()
+	 *
+	 * @return string
+	 */
+	public function cache_store() : string {
+		static $store = null;
+
+		if ( ! is_null( $store ) ) {
+			return $store;
+		}
+
+		$store = 'transient';
+
+		if ( in_array( $this->when_can_scan(), array( 'cli', 'heartbeat', 'manually', 'never' ) ) ) {
+			$store = 'option';
+		}
+
+		/**
+		 * Set which cache system to use.
+		 *
+		 * @param string $store
+		 * @param string $when_can_scan
+		 */
+		$store = apply_filters( 'what-git-branch/cache_store()', $store, $this->when_can_scan() );
+
+		if ( ! in_array( $store, array( 'option', 'transient' ) ) ) {
+			$store = 'transient';
+		}
+
+		return $store;
+	}
+
+	/**
+	 * Store scanned directories into cache.
+	 *
+	 * @param array<int, string> $dirs
+	 *
+	 * @return void
+	 */
+	protected function set_dirs_to_cache( array $dirs ) : void {
+		if ( 'option' === $this->cache_store() ) {
+			update_option( self::CACHE_KEY, $dirs );
+			return;
+		}
+
+		$expiration = MINUTE_IN_SECONDS * 10;
+
+		/**
+		 * Change transient expiration.
+		 *
+		 * @param int $expiration
+		 * @param string $when_can_scan
+		 */
+		$expiration = absint( apply_filters( 'what-git-branch/set_dirs_to_cache()/$expiration', $expiration, $this->when_can_scan() ) );
+
+		set_transient( self::CACHE_KEY, $dirs, $expiration );
+	}
+
+	/**
+	 * Register hooks.
+	 *
+	 * @uses $this->primary()
+	 *
+	 * @return void
+	 */
 	protected function hooks() : void {
 		add_action( 'admin_enqueue_scripts', array( $this, 'action__admin_enqueue_scripts' ) );
 		add_action( 'wp_dashboard_setup',    array( $this, 'action__wp_dashboard_setup' ) );
 
-		if ( empty( $this->root_repo ) ) {
+		if ( empty( $this->primary() ) ) {
 			return;
 		}
 
@@ -282,6 +526,7 @@ class Plugin {
 	 * Register Dashboard widget.
 	 *
 	 * @uses wp_add_dashboard_widget()
+	 * @uses $this->callback__dashboard_widget()
 	 *
 	 * @return void
 	 */
@@ -293,9 +538,18 @@ class Plugin {
 	 * Callback: wp_add_dashboard_widget()
 	 *
 	 * @see $this->register_dashboard_widget()
+	 *
+	 * @uses $this->set_repos()
+	 * @uses \What_Git_Branch::Repository::get_github_url()
+	 * @uses $this->primary()
+	 * @uses \What_Git_Branch::Repository::key()
+	 * @uses \What_Git_Branch::Repository::get_head_ref()
+	 *
 	 * @return void
 	 */
 	public function callback__dashboard_widget() : void {
+		$this->set_repos();
+
 		if ( empty( $this->repos ) ) {
 			echo '<p>No repositories found.</p>';
 			return;
@@ -312,7 +566,14 @@ class Plugin {
 		echo '<table cellpadding="0" cellspacing="0" width="100%">';
 
 		foreach ( $this->repos as $repo ) {
-			if ( apply_filters( 'what-git-branch/callback__dashboard_widget/foreach/continue', false, $repo->path ) ) {
+
+			/**
+			 * Skip printing of repository in dashboard widget.
+			 *
+			 * @param bool $skip
+			 * @param string $repo_path
+			 */
+			if ( apply_filters( 'what-git-branch/dashboard/foreach/continue', false, $repo->path ) ) {
 				continue;
 			}
 
@@ -320,10 +581,8 @@ class Plugin {
 			$github_link = '';
 			$github_url  = $repo->get_github_url();
 
-			$name = apply_filters( 'what-git-branch/callback__dashboard_widget/foreach/name', basename( $repo->path ), $repo );
-
-			if ( $repo->is_root || ( ! empty( $this->root_repo ) && $repo->path === $this->root_repo->path ) ) {
-				$attr__class = ' class="is-root"';
+			if ( ! empty( $this->primary() ) && $repo->path === $this->primary()->path ) {
+				$attr__class = ' class="is-primary"';
 			}
 
 			if ( ! empty( $github_url ) ) {
@@ -338,7 +597,7 @@ class Plugin {
 				'<tr valign="top"%s><th scope="row" title="%s">%s</th><td><code data-wgb-key="%s">%s</code>%s</td>',
 				$attr__class,
 				esc_attr( $repo->path ),
-				esc_html( $name ),
+				esc_html( $repo->name ),
 				esc_attr( $repo->key() ),
 				esc_html( $repo->get_head_ref() ),
 				$github_link
@@ -403,6 +662,11 @@ class Plugin {
 		return trim( ob_get_clean() );
 	}
 
+	/**
+	 * Add inline styles to Dashboard.
+	 *
+	 * @return string
+	 */
 	protected function add_inline_style__dashboard() : string {
 		ob_start();
 		?>
@@ -429,20 +693,20 @@ class Plugin {
 			text-align: left;
 		}
 
-		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root :is( th, td ) {
+		#dashboard-widgets-wrap #what-git-branch .inside tr.is-primary :is( th, td ) {
 			color: #FFF;
 		}
 
-		#dashboard-widgets-wrap #what-git-branch .inside tr:nth-child( odd ):not( .is-root ) :is( th, td ) {
+		#dashboard-widgets-wrap #what-git-branch .inside tr:nth-child( odd ):not( .is-primary ) :is( th, td ) {
 			background-color: #eee;
 		}
 
-		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root {
+		#dashboard-widgets-wrap #what-git-branch .inside tr.is-primary {
 			position: relative;
 			z-index: 1;
 		}
 
-		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root th::before {
+		#dashboard-widgets-wrap #what-git-branch .inside tr.is-primary th::before {
 			content: '';
 			position: absolute;
 			left: -13px;
@@ -463,7 +727,7 @@ class Plugin {
 			color: #999;
 		}
 
-		#dashboard-widgets-wrap #what-git-branch .inside tr.is-root a {
+		#dashboard-widgets-wrap #what-git-branch .inside tr.is-primary a {
 			color: #FFF;
 		}
 
@@ -492,18 +756,16 @@ class Plugin {
 	 * Heartbeat API is used to periodically check the git branch,
 	 * and update the branch name in the admin bar and Dashboard widget.
 	 *
+	 * @uses $this->is_primary()
+	 *
 	 * @return bool
 	 */
 	protected function needs_heartbeat() : bool {
-		if ( empty( $this->root_repo ) ) {
-			return false;
+		if ( function_exists( 'get_current_screen' ) ) {
+			return 'dashboard' === get_current_screen()->id;
 		}
 
-		if ( is_admin_bar_showing() ) {
-			return true;
-		}
-
-		return function_exists( 'get_current_screen' ) && 'dashboard' === get_current_screen()->id;
+		return is_admin_bar_showing() && ! empty( $this->primary() );
 	}
 
 	/**
@@ -539,7 +801,7 @@ class Plugin {
 					el.setAttribute( 'href', heartbeat_data[ el.dataset.wgbKey ]['github_url'] );
 				} );
 
-				document.querySelector( '#wp-admin-bar-what-git-branch > a' ).setAttribute( 'href', heartbeat_data['root']['github_url'] );
+				document.querySelector( '#wp-admin-bar-what-git-branch > a' ).setAttribute( 'href', heartbeat_data['primary']['github_url'] );
 			} );
 
 		} () );
@@ -597,6 +859,12 @@ class Plugin {
 	 * Action: admin_bar_menu
 	 *
 	 * @param \WP_Admin_Bar $bar (reference)
+	 *
+	 * @uses $this->primary()
+	 * @uses \What_Git_Branch\Repository::key()
+	 * @uses \What_Git_Branch\Repository::get_head_ref()
+	 * @uses \What_Git_Branch\Repository::get_github_url()
+	 *
 	 * @return void
 	 */
 	public function action__admin_bar_menu( \WP_Admin_Bar $bar ) : void {
@@ -604,7 +872,11 @@ class Plugin {
 			return;
 		}
 
-		$repo = $this->root_repo;
+		if ( empty( $this->primary() ) ) {
+			return;
+		}
+
+		$repo = $this->primary();
 		$args = array(
 			'id'     => 'what-git-branch',
 			'title'  => sprintf(
@@ -634,13 +906,21 @@ class Plugin {
 	 * Action: heartbeat_received
 	 *
 	 * @param mixed $response
-	 * @param array $data
-	 * @return array
+	 * @param array<string, mixed> $data
+	 *
+	 * @uses $this->set_repos()
+	 * @uses \What_Git_Branch\Repository::key()
+	 * @uses \What_Git_Branch\Repository::get_head_ref()
+	 * @uses \What_Git_Branch\Repository::get_github_url()
+	 *
+	 * @return array<string, mixed>
 	 */
-	public function action__heartbeat_received( $response, array $data ) {
+	public function action__heartbeat_received( $response, array $data ) : array {
 		if ( empty( $data[ self::HEARTBEAT_KEY ] ) ) {
 			return $response;
 		}
+
+		$this->set_repos();
 
 		$repos = array();
 
@@ -648,13 +928,14 @@ class Plugin {
 			$repos[ $repo->key() ] = array(
 				'head_ref'   => $repo->get_head_ref(),
 				'github_url' => $repo->get_github_url(),
+				'primary'    => false,
 			);
 
-			if ( ! $repo->is_root ) {
+			if ( $repo->path !== $this->primary()->path ) {
 				continue;
 			}
 
-			$repos['root'] = &$repos[ $repo->key() ];
+			$repos[ $repo->key() ]['primary'] = true;
 		}
 
 		$response[ self::HEARTBEAT_KEY ] = $repos;
@@ -662,6 +943,11 @@ class Plugin {
 		return $response;
 	}
 
+}
+
+if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) && file_exists( __DIR__ . '/class-wpcli.php' ) ) {
+	Plugin::init_cli();
+	return;
 }
 
 add_action( 'init', static function() : void {
@@ -679,9 +965,3 @@ add_action( 'init', static function() : void {
 
 	Plugin::init();
 } );
-
-if ( ! defined( 'WP_CLI' ) || ! constant( 'WP_CLI' ) || ! file_exists( __DIR__ . '/class-wpcli.php' ) ) {
-	return;
-}
-
-Plugin::init_cli();
