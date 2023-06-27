@@ -159,7 +159,7 @@ class Repository {
 		 * @param string $head_ref
 		 * @param string $raw_head_ref
 		 */
-		return apply_filters( 'what-git-branch/get_head_ref()/commit', $head_ref, $this->head_ref );
+		return apply_filters( 'what-git-branch/repository/get_head_ref()/commit', $head_ref, $this->head_ref );
 	}
 
 	/**
@@ -186,7 +186,7 @@ class Repository {
 		 * @param string $branch
 		 * @param self $this
 		 */
-		$branch = apply_filters( 'what-git-branch/get_branch()/$branch', $branch, $this );
+		$branch = apply_filters( 'what-git-branch/repository/get_branch()/$branch', $branch, $this );
 
 		$this->branch = $branch;
 
@@ -245,7 +245,7 @@ class Repository {
 		 * @param string $github_repo
 		 * @param string $directory_path
 		 */
-		$github_repo = apply_filters( 'what-git-branch/get_github_url()/$github_repo', $github_repo, $this->path );
+		$github_repo = apply_filters( 'what-git-branch/repository/get_github_url()/$github_repo', $github_repo, $this->path );
 
 		if ( empty( $github_repo ) || ! is_string( $github_repo ) ) {
 			return '';

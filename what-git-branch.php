@@ -497,7 +497,7 @@ class Plugin {
 		 * @param int $expiration
 		 * @param string $when_can_scan
 		 */
-		$expiration = apply_filters( 'what-git-branch/set_dirs_to_cache()/$expiration', $expiration, $this->when_can_scan() );
+		$expiration = absint( apply_filters( 'what-git-branch/set_dirs_to_cache()/$expiration', $expiration, $this->when_can_scan() ) );
 
 		set_transient( self::CACHE_KEY, $dirs, $expiration );
 	}
