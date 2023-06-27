@@ -9,18 +9,30 @@ Author URI: https://develop.calebstauffer.com
 
 namespace What_Git_Branch;
 
+use \WP_CLI;
+
 if ( ! defined( 'WPINC' ) || ! function_exists( 'add_filter' ) ) {
 	header( 'Status: 403 Forbidden' );
 	header( 'HTTP/1.1 403 Forbidden' );
 	exit();
 }
 
+/**
+ * @property-read array<string, \What_Git_Branch\Repository> $repos
+ */
 class Plugin {
 
 	public const CACHE_KEY     = 'what-git-branch-dirs';
 	public const HEARTBEAT_KEY = 'what_git_branch';
 
-	protected $repos   = array();
+	/**
+	 * @var array<string, \What_Git_Branch\Repository>
+	 */
+	protected $repos = array();
+
+	/**
+	 * @var null|\What_Git_Branch\Repository
+	 */
 	protected $primary = null;
 
 	/**
@@ -86,12 +98,27 @@ class Plugin {
 	/**
 	 * Glob recursively.
 	 *
+	 * @param string $pattern
+	 *
 	 * @uses $this->recursive_glob()
+	 *
+	 * @return string[]
 	 */
-	protected function recursive_glob( $pattern ) : array {
+	protected function recursive_glob( string $pattern ) : array {
 		$files = glob( $pattern );
 
-		foreach ( glob( dirname( $pattern ) . '/*', GLOB_ONLYDIR|GLOB_NOSORT ) as $dir ) {
+		if ( ! is_array( $files ) ) {
+			$files = array();
+		}
+
+		$dirs_pattern = dirname( $pattern ) . '/*';
+		$dirs = glob( $dirs_pattern, GLOB_ONLYDIR|GLOB_NOSORT );
+
+		if ( ! is_array( $dirs ) ) {
+			$dirs = array();
+		}
+
+		foreach ( $dirs as $dir ) {
 			$files = array_merge( $files, $this->recursive_glob( trailingslashit( $dir ) . basename( $pattern ) ) );
 		}
 
@@ -101,9 +128,9 @@ class Plugin {
 	/**
 	 * Get primary repository.
 	 *
-	 * @return \What_Git_Branch\Repository
+	 * @return null|\What_Git_Branch\Repository
 	 */
-	public function primary() : Repository {
+	public function primary() : ?Repository {
 		if ( ! empty( $this->primary ) ) {
 			return $this->primary;
 		}
@@ -199,6 +226,7 @@ class Plugin {
 		}
 
 		$dirs = array_unique( $dirs );
+		$dirs = array_filter( $dirs, 'is_string' );
 
 		if ( empty( $dirs ) ) {
 			return array();
@@ -408,7 +436,7 @@ class Plugin {
 		}
 
 		if ( $cli ) {
-			\WP_CLI::debug( sprintf( 'Scanning is permitted when (key): %s', $when ) );
+			WP_CLI::debug( sprintf( 'Scanning is permitted when (key): %s', $when ) );
 		}
 
 		// Scan once per HTTP request.
@@ -519,7 +547,7 @@ class Plugin {
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'action__wp_enqueue_scripts' ) );
 		add_action( 'admin_bar_menu',     array( $this, 'action__admin_bar_menu' ), 5000 );
-		add_action( 'heartbeat_received', array( $this, 'action__heartbeat_received' ), 10, 2 );
+		add_filter( 'heartbeat_received', array( $this, 'filter__heartbeat_received' ), 10, 2 );
 	}
 
 	/**
@@ -622,10 +650,16 @@ class Plugin {
 			wp_add_inline_style( 'admin-bar', $this->add_inline_style__admin_bar() );
 		}
 
+		$screen = null;
+
+		if ( function_exists( 'get_current_screen' ) ) {
+			$screen = get_current_screen();
+		}
+
 		if (
-			function_exists( 'get_current_screen' )
-			&& is_a( get_current_screen(), \WP_Screen::class )
-			&& 'dashboard' === get_current_screen()->id
+			   is_object( $screen )
+			&& is_a( $screen, \WP_Screen::class )
+			&& 'dashboard' === $screen->id
 		) {
 			wp_add_inline_style( 'dashboard', $this->add_inline_style__dashboard() );
 		}
@@ -659,7 +693,13 @@ class Plugin {
 		}
 
 		<?php
-		return trim( ob_get_clean() );
+		$output = ob_get_clean();
+
+		if ( empty( $output ) ) {
+			return '';
+		}
+
+		return trim( $output );
 	}
 
 	/**
@@ -747,7 +787,13 @@ class Plugin {
 		}
 
 		<?php
-		return trim( ob_get_clean() );
+		$output = ob_get_clean();
+
+		if ( empty( $output ) ) {
+			return '';
+		}
+
+		return trim( $output );
 	}
 
 	/**
@@ -762,7 +808,13 @@ class Plugin {
 	 */
 	protected function needs_heartbeat() : bool {
 		if ( function_exists( 'get_current_screen' ) ) {
-			return 'dashboard' === get_current_screen()->id;
+			$screen = get_current_screen();
+
+			if ( is_null( $screen ) ) {
+				return false;
+			}
+
+			return 'dashboard' === $screen->id;
 		}
 
 		return is_admin_bar_showing() && ! empty( $this->primary() );
@@ -807,7 +859,13 @@ class Plugin {
 		} () );
 
 		<?php
-		return trim( ob_get_clean() );
+		$output = ob_get_clean();
+
+		if ( empty( $output ) ) {
+			return '';
+		}
+
+		return trim( $output );
 	}
 
 	/**
@@ -885,7 +943,6 @@ class Plugin {
 				esc_attr( $repo->path ),
 				esc_html( $repo->get_head_ref() )
 			),
-			'parent' => false,
 			'meta'   => array(
 				'onclick' => 'if ( navigator.clipboard) { navigator.clipboard.writeText( "' . $repo->get_head_ref() . '" ).then( () => { alert( "Copied branch name." ) } ) }',
 			),
@@ -903,7 +960,7 @@ class Plugin {
 	}
 
 	/**
-	 * Action: heartbeat_received
+	 * Filter: heartbeat_received
 	 *
 	 * @param mixed $response
 	 * @param array<string, mixed> $data
@@ -915,14 +972,15 @@ class Plugin {
 	 *
 	 * @return array<string, mixed>
 	 */
-	public function action__heartbeat_received( $response, array $data ) : array {
+	public function filter__heartbeat_received( $response, array $data ) : array {
 		if ( empty( $data[ self::HEARTBEAT_KEY ] ) ) {
 			return $response;
 		}
 
 		$this->set_repos();
 
-		$repos = array();
+		$repos   = array();
+		$primary = $this->primary();
 
 		foreach ( $this->repos as $repo ) {
 			$repos[ $repo->key() ] = array(
@@ -931,7 +989,7 @@ class Plugin {
 				'primary'    => false,
 			);
 
-			if ( $repo->path !== $this->primary()->path ) {
+			if ( empty( $primary ) || $repo->path !== $primary->path ) {
 				continue;
 			}
 

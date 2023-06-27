@@ -6,6 +6,9 @@ use \WP_CLI;
 
 class WPCLI {
 
+	/**
+	 * @var \What_Git_Branch\Plugin
+	 */
 	protected $plugin;
 
 	/**
@@ -61,7 +64,7 @@ class WPCLI {
 	/**
 	 * Command: directories
 	 *
-	 * @param array<int, string>
+	 * @param array<int, string> $args
 	 *
 	 * @return void
 	 */
@@ -79,7 +82,7 @@ class WPCLI {
 	 *
 	 * @return void
 	 */
-	protected function directories_scan( $args ) : void {
+	protected function directories_scan( array $args ) : void {
 		if ( 'scan' !== $args[0] ) {
 			return;
 		}
@@ -115,15 +118,16 @@ class WPCLI {
 			return;
 		}
 
+		$result = false;
+
 		if ( 'option' === $this->plugin->cache_store() ) {
 			$result = delete_option( Plugin::CACHE_KEY );
 		} else {
 			$result = delete_transient( Plugin::CACHE_KEY );
 		}
 
-		if ( ! $result ) {
+		if ( false === $result ) {
 			WP_CLI::error( 'Unable to clear directories cache' );
-			exit;
 		}
 
 		WP_CLI::success( 'Cleared directories cache.' );
@@ -173,13 +177,19 @@ class WPCLI {
 			return;
 		}
 
+		$primary = $this->plugin->primary();
+
+		if ( is_null( $primary ) ) {
+			return;
+		}
+
 		if ( empty( $args[1] ) || 'ref' === $args[1] ) {
-			WP_CLI::line( $this->plugin->primary()->get_head_ref() );
+			WP_CLI::line( $primary->get_head_ref() );
 			exit;
 		}
 
 		if ( 'path' === $args[1] ) {
-			WP_CLI::line( $this->plugin->primary()->path );
+			WP_CLI::line( $primary->path );
 			exit;
 		}
 
@@ -200,7 +210,13 @@ class WPCLI {
 			return;
 		}
 
-		$filepath = $this->plugin->primary()->path . Repository::EXTERNAL_FILE;
+		$primary = $this->plugin->primary();
+
+		if ( is_null( $primary ) ) {
+			return;
+		}
+
+		$filepath = $primary->path . Repository::EXTERNAL_FILE;
 
 		WP_CLI::debug( sprintf( 'Saving text to file: %s', $filepath ) );
 
@@ -230,21 +246,23 @@ class WPCLI {
 			return;
 		}
 
-		if ( is_null( $this->plugin->primary()->external_file ) ) {
+		$primary = $this->plugin->primary();
+
+		if ( empty( $primary ) || is_null( $primary->external_file ) ) {
 			WP_CLI::warning( 'Primary repository using git head ref; cannot reset.' );
 			exit;
 		}
 
-		WP_CLI::debug( sprintf( 'Checking file exists: %s', $this->plugin->primary()->external_file ) );
+		WP_CLI::debug( sprintf( 'Checking file exists: %s', $primary->external_file ) );
 
-		if ( ! file_exists( $this->plugin->primary()->external_file ) ) {
+		if ( ! file_exists( $primary->external_file ) ) {
 			WP_CLI::warning( 'Primary repository using git head ref; cannot reset.' );
 			exit;
 		}
 
 		WP_CLI::debug( 'Deleting external file' );
 
-		$result = unlink( $this->plugin->primary()->external_file );
+		$result = unlink( $primary->external_file );
 
 		if ( ! $result ) {
 			WP_CLI::error( 'Unable to delete external file.' );
