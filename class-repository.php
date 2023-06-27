@@ -2,16 +2,47 @@
 
 namespace What_Git_Branch;
 
+/**
+ * @property-read string $name
+ * @property-read string $path
+ * @property-read string $external_file
+ * @property-read string $head_ref
+ * @proeprty-read string $branch
+ * @property-read bool $is_primary
+ */
 class Repository {
 
 	public const EXTERNAL_FILE = '.what-git-branch';
 	public const HEAD_PREFIX   = 'ref: refs/heads/';
 
+	/**
+	 * @var null|string
+	 */
 	protected $name;
+
+	/**
+	 * @var null|string
+	 */
 	protected $path;
+
+	/**
+	 * @var null|string
+	 */
 	protected $external_file;
+
+	/**
+	 * @var null|string
+	 */
 	protected $head_ref;
+
+	/**
+	 * @var null|string
+	 */
 	protected $branch;
+
+	/**
+	 * @var bool
+	 */
 	protected $is_primary = false;
 
 	/**
@@ -95,6 +126,11 @@ class Repository {
 		$this->external_file = $path;
 
 		$external_file = file_get_contents( $path );
+
+		if ( ! is_string( $external_file ) ) {
+			return;
+		}
+
 		$external_file = sanitize_text_field( $external_file );
 
 		if ( empty( $external_file ) ) {
@@ -184,7 +220,7 @@ class Repository {
 		 * Set branch name.
 		 *
 		 * @param string $branch
-		 * @param self $this
+		 * @param self $repo
 		 */
 		$branch = apply_filters( 'what-git-branch/repository/get_branch()/$branch', $branch, $this );
 
