@@ -93,7 +93,8 @@ class Plugin {
 	/**
 	 * Construct.
 	 */
-	protected function __construct() {}
+	protected function __construct() {
+	}
 
 	/**
 	 * Glob recursively.
@@ -112,7 +113,7 @@ class Plugin {
 		}
 
 		$dirs_pattern = dirname( $pattern ) . '/*';
-		$dirs = glob( $dirs_pattern, GLOB_ONLYDIR|GLOB_NOSORT );
+		$dirs         = glob( $dirs_pattern, GLOB_ONLYDIR | GLOB_NOSORT );
 
 		if ( ! is_array( $dirs ) ) {
 			$dirs = array();
@@ -539,14 +540,14 @@ class Plugin {
 	 */
 	protected function hooks() : void {
 		add_action( 'admin_enqueue_scripts', array( $this, 'action__admin_enqueue_scripts' ) );
-		add_action( 'wp_dashboard_setup',    array( $this, 'action__wp_dashboard_setup' ) );
+		add_action( 'wp_dashboard_setup', array( $this, 'action__wp_dashboard_setup' ) );
 
 		if ( empty( $this->primary() ) ) {
 			return;
 		}
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'action__wp_enqueue_scripts' ) );
-		add_action( 'admin_bar_menu',     array( $this, 'action__admin_bar_menu' ), 5000 );
+		add_action( 'admin_bar_menu', array( $this, 'action__admin_bar_menu' ), 5000 );
 		add_filter( 'heartbeat_received', array( $this, 'filter__heartbeat_received' ), 10, 2 );
 	}
 
@@ -589,7 +590,7 @@ class Plugin {
 			$sort__directories[] = basename( $repo->path );
 		}
 
-		array_multisort( $sort__directories, SORT_ASC, SORT_NATURAL|SORT_FLAG_CASE, $this->repos );
+		array_multisort( $sort__directories, SORT_ASC, SORT_NATURAL | SORT_FLAG_CASE, $this->repos );
 
 		echo '<table cellpadding="0" cellspacing="0" width="100%">';
 
@@ -936,14 +937,14 @@ class Plugin {
 
 		$repo = $this->primary();
 		$args = array(
-			'id'     => 'what-git-branch',
-			'title'  => sprintf(
+			'id'    => 'what-git-branch',
+			'title' => sprintf(
 				'<span data-wgb-key="%s" title="%s">%s</span>',
 				esc_attr( $repo->key() ),
 				esc_attr( $repo->path ),
 				esc_html( $repo->get_head_ref() )
 			),
-			'meta'   => array(
+			'meta'  => array(
 				'onclick' => 'if ( navigator.clipboard) { navigator.clipboard.writeText( "' . $repo->get_head_ref() . '" ).then( () => { alert( "Copied branch name." ) } ) }',
 			),
 		);
@@ -1008,7 +1009,7 @@ if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) && file_exists( __DIR__ . '/cla
 	return;
 }
 
-add_action( 'init', static function() : void {
+add_action( 'init', static function () : void {
 	if ( 'production' === wp_get_environment_type() ) {
 		return;
 	}

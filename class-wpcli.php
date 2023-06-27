@@ -51,12 +51,12 @@ class WPCLI {
 			$rows[] = array(
 				'name' => $repo->name,
 				'ref'  => $repo->get_head_ref(),
-				'path' => str_replace( ABSPATH , './', $repo->path ),
+				'path' => str_replace( ABSPATH, './', $repo->path ),
 			);
 		}
 
 		$names = array_column( $rows, 'name' );
-		array_multisort( $names, SORT_ASC, SORT_NATURAL|SORT_FLAG_CASE, $rows );
+		array_multisort( $names, SORT_ASC, SORT_NATURAL | SORT_FLAG_CASE, $rows );
 
 		WP_CLI\Utils\format_items( $format, $rows, $fields );
 	}
