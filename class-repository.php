@@ -197,7 +197,7 @@ class Repository {
 		 * Change head reference for repository.
 		 *
 		 * @param string $head_ref
-		 * @param string $raw_head_ref
+		 * @param self $repository
 		 */
 		return apply_filters( 'what-git-branch/repository/get_head_ref()/commit', $head_ref, $this );
 	}
