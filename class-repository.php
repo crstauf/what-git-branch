@@ -181,6 +181,10 @@ class Repository {
 			$this->set_head_ref();
 		}
 
+		if ( empty( $this->head_ref ) ) {
+			return apply_filters( 'what-git-branch/repository/get_head_ref()/commit', '', $this );
+		}
+
 		$branch = $this->get_branch();
 
 		if ( ! empty( $branch ) ) {
@@ -195,7 +199,7 @@ class Repository {
 		 * @param string $head_ref
 		 * @param string $raw_head_ref
 		 */
-		return apply_filters( 'what-git-branch/repository/get_head_ref()/commit', $head_ref, $this->head_ref );
+		return apply_filters( 'what-git-branch/repository/get_head_ref()/commit', $head_ref, $this );
 	}
 
 	/**
@@ -241,6 +245,10 @@ class Repository {
 	public function is_branch() : bool {
 		if ( empty( $this->head_ref ) ) {
 			$this->set_head_ref();
+		}
+
+		if ( empty( $this->head_ref ) ) {
+			return false;
 		}
 
 		if ( ! empty( $this->external_file ) ) {
