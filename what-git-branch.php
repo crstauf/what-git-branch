@@ -963,7 +963,7 @@ class Plugin {
 	/**
 	 * Filter: heartbeat_received
 	 *
-	 * @param mixed $response
+	 * @param null|array<string, mixed> $response
 	 * @param array<string, mixed> $data
 	 *
 	 * @uses $this->set_repos()
@@ -971,9 +971,9 @@ class Plugin {
 	 * @uses \What_Git_Branch\Repository::get_head_ref()
 	 * @uses \What_Git_Branch\Repository::get_github_url()
 	 *
-	 * @return array<string, mixed>
+	 * @return null|array<string, mixed>
 	 */
-	public function filter__heartbeat_received( $response, array $data ) : array {
+	public function filter__heartbeat_received( $response, array $data ) {
 		if ( empty( $data[ self::HEARTBEAT_KEY ] ) ) {
 			return $response;
 		}
