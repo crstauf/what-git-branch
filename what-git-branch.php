@@ -834,6 +834,7 @@ class Plugin {
 
 			var heartbeat_key = <?php echo json_encode( self::HEARTBEAT_KEY ) ?>;
 			var heartbeat_data;
+			var primary;
 
 			jQuery( document ).on( 'heartbeat-send', function ( ev, data ) {
 				data[ heartbeat_key ] = true;
@@ -848,13 +849,21 @@ class Plugin {
 
 				document.querySelectorAll( '[data-wgb-key]:not( .wgb-only-link )' ).forEach( function( el ) {
 					el.innerText = heartbeat_data[ el.dataset.wgbKey ]['head_ref'];
+
+					if ( heartbeat_data[ el.dataset.wgbKey ]['primary'] ) {
+						primary = heartbeat_data[ el.dataset.wgbKey ];
+					}
 				} );
 
 				document.querySelectorAll( 'a[data-wgb-key]' ).forEach( function( el ) {
 					el.setAttribute( 'href', heartbeat_data[ el.dataset.wgbKey ]['github_url'] );
 				} );
 
-				document.querySelector( '#wp-admin-bar-what-git-branch > a' ).setAttribute( 'href', heartbeat_data['primary']['github_url'] );
+				if ( ! primary || ! document.querySelector( '#wp-admin-bar-what-git-branch > a' ) ) {
+					return;
+				}
+
+				document.querySelector( '#wp-admin-bar-what-git-branch > a' ).setAttribute( 'href', primary['github_url'] );
 			} );
 
 		} () );
